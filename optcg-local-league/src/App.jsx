@@ -774,7 +774,10 @@ export default function App() {
   }
 
   async function unlockUpload() {
-    const code = adminCodeInput.trim();
+    const code = adminCodeInput
+      .normalize("NFKC")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
     if (!code) {
       setUploadStatus("Enter admin code.");
       return;
