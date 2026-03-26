@@ -351,6 +351,9 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
                 <SortHeader label="Position" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
               </th>
               <th className="px-4 py-3 text-left">
+                <SortHeader label="Bandai ID" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
                 <SortHeader label="Player" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
               </th>
               <th className="px-4 py-3 text-left">
@@ -395,6 +398,7 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm font-semibold text-slate-900">{entry.name}</td>
+                  <td className="px-4 py-3 text-sm text-slate-800">{entry.memberNumber || "-"}</td>
                   <td className="px-4 py-3 text-sm font-bold text-amber-700">{entry.points}</td>
                   <td className="px-4 py-3 text-sm text-emerald-800">{formatRatioValue(entry.wins)}</td>
                   <td className="px-4 py-3 text-sm text-rose-800">{formatRatioValue(entry.losses)}</td>
@@ -786,6 +790,7 @@ export default function App() {
       return {
         playerId: entry.key,
         name: entry.name,
+        memberNumber: entry.memberNumber ?? "",
         points: totalPoints,
         wins,
         losses,
