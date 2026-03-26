@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Anchor,
@@ -667,6 +667,12 @@ export default function App() {
   const [adminCodeInput, setAdminCodeInput] = useState("");
   const [isUploadUnlocked, setIsUploadUnlocked] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [nextEventLinkInput, setNextEventLinkInput] = useState("");
+  const [nextEventLink, setNextEventLink] = useState("");
+
+  useEffect(() => {
+    document.title = "Magic Lair League";
+  }, []);
 
   const mergedRankings = useMemo(() => {
     return leaderboardEntries.map((entry) => {
@@ -759,7 +765,7 @@ export default function App() {
   }, [leaderboardEntries, roundColumns]);
 
   const summaryStats = [
-    { label: "Players", value: players.length },
+    { label: "Players", value: leaderboardEntries.length },
     { label: "Rounds", value: roundColumns.length },
     { label: "Format", value: "League" },
   ];
@@ -872,6 +878,17 @@ export default function App() {
     setUploadStatus("All leaderboard data cleared.");
   }
 
+  function saveNextEventLink() {
+    const raw = nextEventLinkInput.trim();
+    if (!raw) {
+      setUploadStatus("Insert a valid event link.");
+      return;
+    }
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    setNextEventLink(normalized);
+    setUploadStatus("Next event link updated.");
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#275ec8_0%,_#143c8f_36%,_#0a2256_100%)] text-slate-100">
       <div className="pointer-events-none absolute inset-0">
@@ -882,7 +899,6 @@ export default function App() {
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <header className="mb-8 rounded-3xl border border-amber-200/35 bg-gradient-to-r from-[#173f95]/90 via-[#1e4ba6]/85 to-[#0f2d6f]/95 p-6 shadow-[0_22px_55px_rgba(2,6,23,0.4)]">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100/90">Straw Hat Fleet</p>
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="flex items-start gap-5">
               <img src={logoNewml} alt="League logo" className="h-28 w-28 shrink-0 object-contain" />
@@ -933,6 +949,13 @@ export default function App() {
           </div>
         </header>
         <div className="mb-8 h-2 rounded-full bg-[repeating-linear-gradient(90deg,#ca293f_0_14px,#efd492_14px_28px,#2d75b6_28px_42px)]" />
+        {nextEventLink ? (
+          <div className="mb-6 rounded-xl border border-amber-200/40 bg-blue-950/55 px-4 py-3 text-sm text-amber-100">
+            <a href={nextEventLink} target="_blank" rel="noreferrer" className="transition hover:text-yellow-200 hover:underline">
+              Register to the next event: {nextEventLink}
+            </a>
+          </div>
+        ) : null}
 
         <AnimatePresence mode="wait">
           {activeTab === "rankings" ? (
@@ -979,20 +1002,38 @@ export default function App() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-amber-100/75">Admin panel</p>
             {isUploadUnlocked ? (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleCsvUpload}
-                  className="block w-full text-xs text-blue-100 file:mr-2 file:rounded-md file:border-0 file:bg-yellow-300 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-slate-900 hover:file:bg-yellow-200 sm:w-auto"
-                />
-                <button
-                  type="button"
-                  onClick={clearAllLeaderboardData}
-                  className="rounded-md border border-rose-300/60 bg-rose-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-rose-300"
-                >
-                  Clear all (test)
-                </button>
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleCsvUpload}
+                    className="block w-full text-xs text-blue-100 file:mr-2 file:rounded-md file:border-0 file:bg-yellow-300 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-slate-900 hover:file:bg-yellow-200 sm:w-auto"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearAllLeaderboardData}
+                    className="rounded-md border border-rose-300/60 bg-rose-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-rose-300"
+                  >
+                    Clear all (test)
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="url"
+                    value={nextEventLinkInput}
+                    onChange={(event) => setNextEventLinkInput(event.target.value)}
+                    placeholder="https://... event registration link"
+                    className="w-full rounded-md border border-blue-200/25 bg-blue-950/50 px-2.5 py-1.5 text-xs text-blue-100 placeholder:text-blue-100/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveNextEventLink}
+                    className="rounded-md border border-amber-300/60 bg-amber-300 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-amber-200"
+                  >
+                    Save event link
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
