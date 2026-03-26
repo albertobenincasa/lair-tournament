@@ -39,7 +39,13 @@ const OPTCG_COLOR_KEYS = ["purple", "blue", "black", "yellow", "green", "red"];
 const LEADER_CATALOG = {};
 
 const DEG2RAD = Math.PI / 180;
-const ADMIN_UPLOAD_CODE = import.meta.env.VITE_UPLOAD_ADMIN_CODE || "newml";
+const ADMIN_CODE_HASH = "9bd740c6731bfb452d59a2a4998f28fac87dba1e4371a63d68d1bfb0aa0871cc";
+
+async function sha256Hex(value) {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 function polarToCartesian(cx, cy, radius, angleDeg) {
   const radians = (angleDeg - 90) * DEG2RAD;
@@ -767,13 +773,24 @@ export default function App() {
     });
   }
 
-  function unlockUpload() {
-    if (adminCodeInput.trim() === ADMIN_UPLOAD_CODE) {
-      setIsUploadUnlocked(true);
-      setUploadStatus("Uploader unlocked.");
+  async function unlockUpload() {
+    const code = adminCodeInput.trim();
+    if (!code) {
+      setUploadStatus("Enter admin code.");
       return;
     }
-    setUploadStatus("Invalid admin code.");
+
+    try {
+      const codeHash = await sha256Hex(code);
+      if (codeHash === ADMIN_CODE_HASH) {
+        setIsUploadUnlocked(true);
+        setUploadStatus("Uploader unlocked.");
+        return;
+      }
+      setUploadStatus("Invalid admin code.");
+    } catch {
+      setUploadStatus("Unable to verify admin code on this browser.");
+    }
   }
 
   async function handleCsvUpload(event) {
