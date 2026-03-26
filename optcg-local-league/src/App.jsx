@@ -10,7 +10,7 @@ import {
   Trophy,
   Waves,
 } from "lucide-react";
-import { leagueMeta, players } from "./data/mockLeagueData";
+import { leagueMeta } from "./data/mockLeagueData";
 import logoNewml from "../logo-newml.png";
 import leaderCatalogData from "../leader_catalog.json";
 
@@ -36,6 +36,7 @@ const optcgColorHex = {
 };
 
 const OPTCG_COLOR_KEYS = ["purple", "blue", "black", "yellow", "green", "red"];
+const NETLIFY_FUNCTIONS_BASE = "/.netlify/functions";
 
 const LEADER_CATALOG = {};
 
@@ -249,6 +250,74 @@ function getLeaderMeta(leaderCode, apiLeaderCatalog = {}) {
 function formatRatioValue(value) {
   if (Number.isInteger(value)) return `${value}`;
   return value.toFixed(1);
+}
+
+function normalizeSharedState(payload) {
+  const safeEntries = Array.isArray(payload?.leaderboardEntries) ? payload.leaderboardEntries : buildInitialEntries();
+  const safeRounds = Array.isArray(payload?.roundColumns) ? payload.roundColumns : buildInitialRoundColumns();
+  const safeLink = typeof payload?.nextEventLink === "string" ? payload.nextEventLink : "";
+  return {
+    leaderboardEntries: safeEntries,
+    roundColumns: safeRounds,
+    nextEventLink: safeLink,
+  };
+}
+
+async function fetchLeagueState() {
+  const response = await fetch(`${NETLIFY_FUNCTIONS_BASE}/get-league-state`);
+  if (!response.ok) throw new Error("load_failed");
+  const payload = await response.json();
+  return payload?.state ? normalizeSharedState(payload.state) : null;
+}
+
+async function saveLeagueState(nextState) {
+  const state = normalizeSharedState(nextState);
+  const response = await fetch(`${NETLIFY_FUNCTIONS_BASE}/set-league-state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state }),
+  });
+  if (!response.ok) throw new Error("save_failed");
+  return state;
+}
+
+function applyLeagueStateToUi(state, setters) {
+  setters.setLeaderboardEntries(state.leaderboardEntries);
+  setters.setRoundColumns(state.roundColumns);
+  setters.setNextEventLink(state.nextEventLink);
+  setters.setNextEventLinkInput(state.nextEventLink);
+}
+
+async function loadSharedStateToUi(setters, { silent = false } = {}) {
+  try {
+    const fetchedState = await fetchLeagueState();
+    if (fetchedState) {
+      applyLeagueStateToUi(fetchedState, setters);
+      if (!silent) setters.setUploadStatus("Shared league loaded.");
+      return true;
+    }
+
+    const emptyState = normalizeSharedState({});
+    await saveLeagueState(emptyState);
+    applyLeagueStateToUi(emptyState, setters);
+    if (!silent) setters.setUploadStatus("Shared league ready.");
+    return true;
+  } catch {
+    if (!silent) setters.setUploadStatus("Unable to load shared league data from Netlify.");
+    return false;
+  }
+}
+
+async function persistSharedState(setters, nextState, successMessage) {
+  try {
+    const savedState = await saveLeagueState(nextState);
+    applyLeagueStateToUi(savedState, setters);
+    if (successMessage) setters.setUploadStatus(successMessage);
+    return true;
+  } catch {
+    setters.setUploadStatus("Unable to sync shared league data to Netlify.");
+    return false;
+  }
 }
 
 function SortHeader({ label, sortKey, sortConfig, onSort, className = "" }) {
@@ -667,8 +736,15 @@ export default function App() {
   const [roundColumns, setRoundColumns] = useState(buildInitialRoundColumns);
   const [isUploadUnlocked, setIsUploadUnlocked] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
-  const [nextEventLinkInput, setNextEventLinkInput] = useState("");
   const [nextEventLink, setNextEventLink] = useState("");
+  const [nextEventLinkInput, setNextEventLinkInput] = useState("");
+  const sharedSetters = {
+    setLeaderboardEntries,
+    setRoundColumns,
+    setNextEventLink,
+    setNextEventLinkInput,
+    setUploadStatus,
+  };
 
   useEffect(() => {
     document.title = "Magic Lair League";
@@ -680,6 +756,10 @@ export default function App() {
       setUploadStatus("Admin tab is locked.");
     }
   }, [activeTab, isUploadUnlocked]);
+
+  useEffect(() => {
+    void loadSharedStateToUi(sharedSetters, { silent: false });
+  }, []);
 
   const mergedRankings = useMemo(() => {
     return leaderboardEntries.map((entry) => {
@@ -895,30 +975,49 @@ export default function App() {
         existing.roundLeaders[nextRound] = leaderCode;
       });
 
-      setLeaderboardEntries(nextEntries);
-      setRoundColumns((current) => [...current, nextRound]);
-      setUploadStatus(`Round ${nextRound} uploaded successfully (${rows.length} rows).`);
+      await persistSharedState(
+        sharedSetters,
+        {
+          leaderboardEntries: nextEntries,
+          roundColumns: [...roundColumns, nextRound],
+          nextEventLink,
+        },
+        `Round ${nextRound} uploaded successfully (${rows.length} rows).`
+      );
       event.target.value = "";
     } catch {
       setUploadStatus("Unable to process CSV file.");
     }
   }
 
-  function clearAllLeaderboardData() {
-    setLeaderboardEntries([]);
-    setRoundColumns([]);
-    setUploadStatus("All leaderboard data cleared.");
+  async function clearAllLeaderboardData() {
+    await persistSharedState(
+      sharedSetters,
+      {
+        leaderboardEntries: [],
+        roundColumns: [],
+        nextEventLink,
+      },
+      "All leaderboard data cleared."
+    );
   }
 
-  function saveNextEventLink() {
+  async function saveNextEventLink() {
     const raw = nextEventLinkInput.trim();
     if (!raw) {
       setUploadStatus("Insert a valid event link.");
       return;
     }
     const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    setNextEventLink(normalized);
-    setUploadStatus("Next event link updated.");
+    await persistSharedState(
+      sharedSetters,
+      {
+        leaderboardEntries,
+        roundColumns,
+        nextEventLink: normalized,
+      },
+      "Next event link updated."
+    );
   }
 
   return (
