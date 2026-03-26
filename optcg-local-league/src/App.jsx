@@ -17,6 +17,7 @@ import leaderCatalogData from "../leader_catalog.json";
 const tabs = [
   { key: "rankings", label: "Rankings", icon: Trophy },
   { key: "decks", label: "Decks", icon: Swords },
+  { key: "admin", label: "Admin", icon: Anchor },
 ];
 
 const medalColors = [
@@ -664,7 +665,6 @@ export default function App() {
   const [sortConfig, setSortConfig] = useState({ key: "points", direction: "desc" });
   const [leaderboardEntries, setLeaderboardEntries] = useState(buildInitialEntries);
   const [roundColumns, setRoundColumns] = useState(buildInitialRoundColumns);
-  const [adminCodeInput, setAdminCodeInput] = useState("");
   const [isUploadUnlocked, setIsUploadUnlocked] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
@@ -673,6 +673,13 @@ export default function App() {
   useEffect(() => {
     document.title = "Magic Lair League";
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "admin" && !isUploadUnlocked) {
+      setActiveTab("rankings");
+      setUploadStatus("Admin tab is locked.");
+    }
+  }, [activeTab, isUploadUnlocked]);
 
   const mergedRankings = useMemo(() => {
     return leaderboardEntries.map((entry) => {
@@ -779,14 +786,14 @@ export default function App() {
     });
   }
 
-  async function unlockUpload() {
-    const code = adminCodeInput
+  async function verifyAdminCode(rawCode) {
+    const code = String(rawCode ?? "")
       .normalize("NFKC")
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
       .trim();
     if (!code) {
       setUploadStatus("Enter admin code.");
-      return;
+      return false;
     }
 
     try {
@@ -794,12 +801,37 @@ export default function App() {
       if (codeHash === ADMIN_CODE_HASH) {
         setIsUploadUnlocked(true);
         setUploadStatus("Uploader unlocked.");
-        return;
+        return true;
       }
-      setUploadStatus("Invalid admin code.");
+      setUploadStatus("baco ci hai provato");
+      window.alert("baco ci hai provato");
+      return false;
     } catch {
       setUploadStatus("Unable to verify admin code on this browser.");
+      return false;
     }
+  }
+
+  async function promptAdminUnlock() {
+    const code = window.prompt("Insert admin code to open Admin panel:");
+    if (code === null) {
+      setUploadStatus("Admin unlock cancelled.");
+      return false;
+    }
+    return verifyAdminCode(code);
+  }
+
+  async function handleTabClick(tabKey) {
+    if (tabKey !== "admin") {
+      setActiveTab(tabKey);
+      return;
+    }
+    if (isUploadUnlocked) {
+      setActiveTab("admin");
+      return;
+    }
+    const isUnlocked = await promptAdminUnlock();
+    if (isUnlocked) setActiveTab("admin");
   }
 
   async function handleCsvUpload(event) {
@@ -925,7 +957,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <nav className="flex flex-wrap gap-2">
+            <nav className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.key;
@@ -933,7 +965,7 @@ export default function App() {
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => handleTabClick(tab.key)}
                     className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
                       isActive
                         ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
@@ -994,71 +1026,61 @@ export default function App() {
               <DecksSection roundDeckData={roundDeckData} />
             </motion.section>
           ) : null}
+          {activeTab === "admin" ? (
+            <motion.section
+              key="admin"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Anchor className="h-5 w-5 text-amber-200" />
+                <h2 className="text-xl font-semibold text-white">Admin Panel</h2>
+              </div>
+              {isUploadUnlocked && (
+                <div className="rounded-xl border border-amber-200/30 bg-gradient-to-r from-blue-950/55 via-blue-900/45 to-blue-950/55 px-3 py-3 backdrop-blur-sm">
+                  <div className="flex w-full flex-col gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleCsvUpload}
+                        className="block w-full text-xs text-blue-100 file:mr-2 file:rounded-md file:border-0 file:bg-yellow-300 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-slate-900 hover:file:bg-yellow-200 sm:w-auto"
+                      />
+                      <button
+                        type="button"
+                        onClick={clearAllLeaderboardData}
+                        className="rounded-md border border-rose-300/60 bg-rose-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-rose-300"
+                      >
+                        Clear all (test)
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="url"
+                        value={nextEventLinkInput}
+                        onChange={(event) => setNextEventLinkInput(event.target.value)}
+                        placeholder="https://... event registration link"
+                        className="w-full rounded-md border border-blue-200/25 bg-blue-950/50 px-2.5 py-1.5 text-xs text-blue-100 placeholder:text-blue-100/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={saveNextEventLink}
+                        className="rounded-md border border-amber-300/60 bg-amber-300 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-amber-200"
+                      >
+                        Save event link
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      {uploadStatus ? <p className="text-[11px] text-blue-100/80">{uploadStatus}</p> : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.section>
+          ) : null}
         </AnimatePresence>
-      </div>
-
-      <div className="mx-auto mt-6 w-full max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <div className="rounded-xl border border-amber-200/30 bg-gradient-to-r from-blue-950/55 via-blue-900/45 to-blue-950/55 px-3 py-3 backdrop-blur-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-amber-100/75">Admin panel</p>
-            {isUploadUnlocked ? (
-              <div className="flex w-full flex-col gap-2">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={handleCsvUpload}
-                    className="block w-full text-xs text-blue-100 file:mr-2 file:rounded-md file:border-0 file:bg-yellow-300 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-slate-900 hover:file:bg-yellow-200 sm:w-auto"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearAllLeaderboardData}
-                    className="rounded-md border border-rose-300/60 bg-rose-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-rose-300"
-                  >
-                    Clear all (test)
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="url"
-                    value={nextEventLinkInput}
-                    onChange={(event) => setNextEventLinkInput(event.target.value)}
-                    placeholder="https://... event registration link"
-                    className="w-full rounded-md border border-blue-200/25 bg-blue-950/50 px-2.5 py-1.5 text-xs text-blue-100 placeholder:text-blue-100/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={saveNextEventLink}
-                    className="rounded-md border border-amber-300/60 bg-amber-300 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-amber-200"
-                  >
-                    Save event link
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  type="password"
-                  value={adminCodeInput}
-                  onChange={(event) => setAdminCodeInput(event.target.value)}
-                  placeholder="Admin code"
-                  className="w-full rounded-md border border-blue-200/25 bg-blue-950/50 px-2.5 py-1.5 text-xs text-blue-100 placeholder:text-blue-100/50 sm:w-40"
-                />
-                <button
-                  type="button"
-                  onClick={unlockUpload}
-                  className="rounded-md border border-yellow-300/55 bg-yellow-300 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-yellow-200"
-                >
-                  Unlock
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] text-blue-100/65">Upload CSV adds next round with W-L records and leader codes.</p>
-            {uploadStatus ? <p className="text-[11px] text-blue-100/80">{uploadStatus}</p> : null}
-          </div>
-        </div>
       </div>
     </main>
   );
