@@ -10,7 +10,7 @@ import {
   Trophy,
   Waves,
 } from "lucide-react";
-import { leagueMeta, players, rankings } from "./data/mockLeagueData";
+import { leagueMeta, players } from "./data/mockLeagueData";
 import logoNewml from "../logo-newml.png";
 import leaderCatalogData from "../leader_catalog.json";
 
@@ -68,20 +68,6 @@ function buildDonutPath({ cx, cy, innerRadius, outerRadius, startAngle, endAngle
     `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
     "Z",
   ].join(" ");
-}
-
-function getPlayerById(playerId) {
-  return players.find((player) => player.id === playerId);
-}
-
-function getRecordFromRounds(rounds = []) {
-  return rounds.reduce(
-    (acc, currentRound) => ({
-      wins: acc.wins + currentRound.wins,
-      losses: acc.losses + currentRound.losses,
-    }),
-    { wins: 0, losses: 0 }
-  );
 }
 
 function parseCsvLine(line) {
