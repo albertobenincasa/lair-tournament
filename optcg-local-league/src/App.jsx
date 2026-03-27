@@ -440,8 +440,8 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
                       <span>{entry.position}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">{entry.name}</td>
                   <td className="px-4 py-3 text-sm text-slate-800">{entry.memberNumber || "-"}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">{entry.name}</td>
                   <td className="px-4 py-3 text-sm font-bold text-amber-700">{entry.points}</td>
                   <td className="px-4 py-3 text-sm text-emerald-800">{formatRatioValue(entry.wins)}</td>
                   <td className="px-4 py-3 text-sm text-rose-800">{formatRatioValue(entry.losses)}</td>
