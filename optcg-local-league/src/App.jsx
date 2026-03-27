@@ -1078,15 +1078,18 @@ export default function App() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#275ec8_0%,_#143c8f_36%,_#0a2256_100%)] text-slate-100">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(160deg,#07193f_0%,#12377f_42%,#0a2152_100%)] text-slate-100">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 top-14 h-72 w-72 rounded-full bg-cyan-300/30 blur-3xl" />
-        <div className="absolute right-0 top-20 h-80 w-80 rounded-full bg-yellow-300/25 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-red-300/20 blur-3xl" />
-        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,transparent_0,transparent_47%,rgba(255,255,255,0.2)_50%,transparent_53%),linear-gradient(to_bottom,transparent_0,transparent_47%,rgba(255,255,255,0.2)_50%,transparent_53%)] [background-size:28px_28px]" />
+        <div className="absolute inset-0 bg-[url('/757b6491-9ff3-458c-aa4c-e37f11de8903.png')] bg-cover bg-center opacity-34 mix-blend-screen" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.24),transparent_36%),radial-gradient(circle_at_84%_10%,rgba(248,113,113,0.2),transparent_32%),radial-gradient(circle_at_50%_92%,rgba(56,189,248,0.2),transparent_35%)]" />
+        <div className="absolute -left-16 top-20 h-72 w-72 rounded-full bg-cyan-300/28 blur-3xl" />
+        <div className="absolute right-4 top-10 h-80 w-80 rounded-full bg-amber-300/22 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-red-300/18 blur-3xl" />
+        <div className="absolute inset-0 opacity-18 [background-image:linear-gradient(to_right,transparent_0,transparent_47%,rgba(255,255,255,0.16)_50%,transparent_53%),linear-gradient(to_bottom,transparent_0,transparent_47%,rgba(255,255,255,0.16)_50%,transparent_53%)] [background-size:30px_30px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.42)_78%,rgba(2,6,23,0.68)_100%)]" />
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="relative mb-8 rounded-3xl border border-amber-200/35 bg-gradient-to-r from-[#173f95]/90 via-[#1e4ba6]/85 to-[#0f2d6f]/95 p-6 pb-20 shadow-[0_22px_55px_rgba(2,6,23,0.4)]">
+        <header className="relative mb-8 rounded-3xl border border-amber-200/45 bg-[linear-gradient(120deg,rgba(44,77,152,0.9)_0%,rgba(57,104,168,0.86)_38%,rgba(178,126,53,0.72)_72%,rgba(39,89,150,0.88)_100%)] p-6 pb-20 shadow-[0_22px_55px_rgba(2,6,23,0.4)] backdrop-blur-[1px]">
           <div className="flex flex-col gap-6">
             <div className="flex items-start gap-5">
               <img src={logoNewml} alt="League logo" className="h-28 w-28 shrink-0 object-contain" />
