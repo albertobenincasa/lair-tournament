@@ -387,7 +387,7 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
   return (
     <div className="overflow-hidden rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)]">
       <div className="overflow-x-auto">
-        <table className="min-w-max divide-y divide-[#d7c49b]">
+        <table className="w-full min-w-max divide-y divide-[#d7c49b]">
           <thead className="bg-[#e8d7b2]">
             <tr>
               <th className="px-4 py-3 text-left whitespace-nowrap">
