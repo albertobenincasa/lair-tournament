@@ -387,28 +387,28 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
   return (
     <div className="overflow-hidden rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)]">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-[#d7c49b]">
+        <table className="min-w-max divide-y divide-[#d7c49b]">
           <thead className="bg-[#e8d7b2]">
             <tr>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Position" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Bandai ID" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Player" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Points" sortKey="points" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Wins" sortKey="wins" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Losses" sortKey="losses" sortConfig={sortConfig} onSort={onSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-left whitespace-nowrap">
                 <SortHeader label="Win Rate" sortKey="winRate" sortConfig={sortConfig} onSort={onSort} />
               </th>
               {roundColumns.map((roundNumber) => (
@@ -449,8 +449,8 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
                   {roundColumns.map((roundNumber) => {
                     const roundResult = entry.roundResults[roundNumber];
                     return (
-                      <td key={`${entry.playerId}-r${roundNumber}`} className="px-3 py-3 text-sm text-slate-800">
-                        <span className="rounded-md border border-[#cab07f] bg-[#efe2c6] px-2 py-1 text-xs">
+                      <td key={`${entry.playerId}-r${roundNumber}`} className="px-3 py-3 text-sm text-slate-800 whitespace-nowrap">
+                        <span className="inline-block whitespace-nowrap rounded-md border border-[#cab07f] bg-[#efe2c6] px-2 py-1 text-xs leading-none">
                           {roundResult?.played ? `${roundResult.wins}-${roundResult.losses}` : "0"}
                         </span>
                       </td>
@@ -902,7 +902,6 @@ export default function App() {
   const summaryStats = [
     { label: "Players", value: leaderboardEntries.length },
     { label: "Rounds", value: roundColumns.length },
-    { label: "Format", value: "League" },
   ];
 
   function handleSort(key) {
@@ -1089,12 +1088,12 @@ export default function App() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.42)_78%,rgba(2,6,23,0.68)_100%)]" />
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="relative mb-8 rounded-3xl border border-amber-200/45 bg-[linear-gradient(120deg,rgba(44,77,152,0.9)_0%,rgba(57,104,168,0.86)_38%,rgba(178,126,53,0.72)_72%,rgba(39,89,150,0.88)_100%)] p-6 pb-20 shadow-[0_22px_55px_rgba(2,6,23,0.4)] backdrop-blur-[1px]">
+        <header className="relative mb-8 rounded-3xl border border-amber-200/45 bg-[linear-gradient(120deg,rgba(44,77,152,0.9)_0%,rgba(57,104,168,0.86)_38%,rgba(178,126,53,0.72)_72%,rgba(39,89,150,0.88)_100%)] p-4 pb-28 shadow-[0_22px_55px_rgba(2,6,23,0.4)] backdrop-blur-[1px] sm:p-6 sm:pb-24">
           <div className="flex flex-col gap-6">
-            <div className="flex items-start gap-5">
-              <img src={logoNewml} alt="League logo" className="h-28 w-28 shrink-0 object-contain" />
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:gap-5">
+              <img src={logoNewml} alt="League logo" className="h-20 w-20 shrink-0 object-contain sm:h-28 sm:w-28" />
               <div>
-                <h1 className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-5xl">
+                <h1 className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl md:text-5xl">
                 {leagueMeta.leagueName}
                 </h1>
                 <p className="mt-2 text-sm text-cyan-50/95 md:text-base">{leagueMeta.subtitle}</p>
@@ -1103,7 +1102,7 @@ export default function App() {
                   <span>Grand Line Weekly Tournament</span>
                   <Waves className="h-3.5 w-3.5" />
                 </div>
-                <div className="mt-4 grid w-full max-w-md grid-cols-3 gap-2">
+                <div className="mt-4 grid w-full max-w-md grid-cols-3 gap-2 sm:max-w-lg">
                   {summaryStats.map((item) => (
                     <div
                       key={item.label}
@@ -1117,7 +1116,7 @@ export default function App() {
               </div>
             </div>
           </div>
-          <nav className="absolute bottom-4 right-4 flex items-center gap-2">
+          <nav className="absolute bottom-4 left-4 right-4 flex flex-wrap justify-end gap-2 sm:left-auto sm:right-4 sm:flex-nowrap">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -1126,7 +1125,7 @@ export default function App() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabClick(tab.key)}
-                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm ${
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm ${
                     isActive
                       ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
                       : "border-blue-300/20 bg-blue-950/65 text-blue-100/80 hover:border-amber-200/50 hover:text-amber-100"
@@ -1141,7 +1140,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => handleTabClick("admin")}
-            className={`absolute right-4 top-4 inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+            className={`absolute right-3 top-3 inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition sm:right-4 sm:top-4 sm:px-3 sm:text-xs ${
               activeTab === "admin"
                 ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
                 : "border-blue-300/20 bg-blue-950/65 text-blue-100/80 hover:border-amber-200/50 hover:text-amber-100"
