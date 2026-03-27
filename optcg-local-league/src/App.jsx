@@ -17,7 +17,19 @@ import leaderCatalogData from "../leader_catalog.json";
 const tabs = [
   { key: "rankings", label: "Rankings", icon: Trophy },
   { key: "decks", label: "Decks", icon: Swords },
-  { key: "admin", label: "Admin", icon: Anchor },
+  { key: "league-info", label: "League Info", icon: Waves },
+];
+
+const LEAGUE_ROUND_CALENDAR = [
+  "01/04",
+  "08/04",
+  "15/04",
+  "22/04",
+  "29/04",
+  "06/05",
+  "13/05",
+  "20/05",
+  "27/05 - la top 8 potente",
 ];
 
 const medalColors = [
@@ -127,6 +139,37 @@ function parseCsvRows(content) {
       return acc;
     }, {});
   });
+}
+
+function normalizeHeaderToken(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function toNormalizedCsvRow(row) {
+  const normalized = {};
+  Object.entries(row).forEach(([key, value]) => {
+    normalized[normalizeHeaderToken(key)] = String(value ?? "").trim();
+  });
+  return normalized;
+}
+
+function getCsvField(normalizedRow, aliases) {
+  for (const alias of aliases) {
+    const value = normalizedRow[normalizeHeaderToken(alias)];
+    if (value) return value;
+  }
+  return "";
+}
+
+function isLikelyBandaiId(value) {
+  const trimmed = String(value ?? "").trim();
+  return /^\d{6,}$/.test(trimmed);
+}
+
+function hasLetters(value) {
+  return /[a-z]/i.test(String(value ?? ""));
 }
 
 function buildInitialEntries() {
@@ -946,11 +989,20 @@ export default function App() {
       });
 
       rows.forEach((row) => {
-        const rawName = (row.Name ?? "").trim();
+        const normalizedRow = toNormalizedCsvRow(row);
+        let rawName = getCsvField(normalizedRow, ["name", "player name", "player", "nickname"]);
+        let memberNumber = getCsvField(normalizedRow, ["member number", "bandai id", "bandaiid", "id"]);
+
+        if (isLikelyBandaiId(rawName) && hasLetters(memberNumber)) {
+          [rawName, memberNumber] = [memberNumber, rawName];
+        }
+
         if (!rawName) return;
 
-        const memberNumber = (row["Member Number"] ?? "").trim();
-        const parsedPoints = Number.parseInt((row.Points ?? "0").replace(/[^\d-]/g, ""), 10);
+        const parsedPoints = Number.parseInt(
+          getCsvField(normalizedRow, ["points", "point", "score"]).replace(/[^\d-]/g, "") || "0",
+          10
+        );
         const points = Number.isNaN(parsedPoints) ? 0 : parsedPoints;
         const normalizedName = rawName.toLowerCase();
 
@@ -976,7 +1028,7 @@ export default function App() {
         const wins = Math.max(0, Math.min(5, Math.round(points / 3)));
         const losses = 5 - wins;
         existing.roundResults[nextRound] = { wins, losses, played: true };
-        const leaderCode = (row.Leader ?? "").trim().toUpperCase();
+        const leaderCode = getCsvField(normalizedRow, ["leader", "leader code", "leadercode"]).toUpperCase();
         existing.roundLeaders[nextRound] = leaderCode;
       });
 
@@ -1034,8 +1086,8 @@ export default function App() {
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,transparent_0,transparent_47%,rgba(255,255,255,0.2)_50%,transparent_53%),linear-gradient(to_bottom,transparent_0,transparent_47%,rgba(255,255,255,0.2)_50%,transparent_53%)] [background-size:28px_28px]" />
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-8 rounded-3xl border border-amber-200/35 bg-gradient-to-r from-[#173f95]/90 via-[#1e4ba6]/85 to-[#0f2d6f]/95 p-6 shadow-[0_22px_55px_rgba(2,6,23,0.4)]">
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <header className="relative mb-8 rounded-3xl border border-amber-200/35 bg-gradient-to-r from-[#173f95]/90 via-[#1e4ba6]/85 to-[#0f2d6f]/95 p-6 pb-20 shadow-[0_22px_55px_rgba(2,6,23,0.4)]">
+          <div className="flex flex-col gap-6">
             <div className="flex items-start gap-5">
               <img src={logoNewml} alt="League logo" className="h-28 w-28 shrink-0 object-contain" />
               <div>
@@ -1061,28 +1113,40 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <nav className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => handleTabClick(tab.key)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
-                      isActive
-                        ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
-                        : "border-blue-300/20 bg-blue-950/65 text-blue-100/80 hover:border-amber-200/50 hover:text-amber-100"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
           </div>
+          <nav className="absolute bottom-4 right-4 flex items-center gap-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => handleTabClick(tab.key)}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm ${
+                    isActive
+                      ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
+                      : "border-blue-300/20 bg-blue-950/65 text-blue-100/80 hover:border-amber-200/50 hover:text-amber-100"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+          <button
+            type="button"
+            onClick={() => handleTabClick("admin")}
+            className={`absolute right-4 top-4 inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+              activeTab === "admin"
+                ? "border-amber-200/80 bg-gradient-to-r from-red-500/35 to-amber-400/30 text-amber-100 shadow-[0_0_0_1px_rgba(253,224,71,0.45)]"
+                : "border-blue-300/20 bg-blue-950/65 text-blue-100/80 hover:border-amber-200/50 hover:text-amber-100"
+            }`}
+          >
+            <Anchor className="h-3.5 w-3.5" />
+            Admin
+          </button>
         </header>
         <div className="mb-8 h-2 rounded-full bg-[repeating-linear-gradient(90deg,#ca293f_0_14px,#efd492_14px_28px,#2d75b6_28px_42px)]" />
         {nextEventLink ? (
@@ -1128,6 +1192,36 @@ export default function App() {
                 <h2 className="text-xl font-semibold text-white">Popular Decks</h2>
               </div>
               <DecksSection roundDeckData={roundDeckData} />
+            </motion.section>
+          ) : null}
+          {activeTab === "league-info" ? (
+            <motion.section
+              key="league-info"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Waves className="h-5 w-5 text-amber-200" />
+                <h2 className="text-xl font-semibold text-white">League Info</h2>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+                <div className="overflow-hidden rounded-2xl border border-cyan-200/30 bg-blue-950/55 p-2 shadow-[0_10px_30px_rgba(34,211,238,0.2)]">
+                  <img src="/leagueinfo.jpeg" alt="League info" className="h-full w-full rounded-xl object-cover" />
+                </div>
+                <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-amber-100">Round Calendar</h3>
+                  <ul className="space-y-2">
+                    {LEAGUE_ROUND_CALENDAR.map((roundDate, index) => (
+                      <li key={roundDate} className="flex items-center justify-between rounded-lg border border-blue-200/20 bg-blue-950/35 px-3 py-2 text-sm">
+                        <span className="text-cyan-100">Round {index + 1}</span>
+                        <span className="font-semibold text-amber-100">{roundDate}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </motion.section>
           ) : null}
           {activeTab === "admin" ? (
