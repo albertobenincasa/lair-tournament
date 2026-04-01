@@ -32,6 +32,23 @@ const LEAGUE_ROUND_CALENDAR = [
   "27/05 - la top 8 potente",
 ];
 
+const LEAGUE_INFO_RULES = [
+  "Torneo ufficiale Bandai.",
+  "Partecipativa a tutti i partecipanti e busta winner al vincitore.",
+  "Torneo stile Svizzera.",
+  "Il costo di iscrizione verra' messo in palio ai migliori risultati.",
+  "Vengono premiati i migliori due risultati (4-0, 3-1).",
+  "Parte dell'iscrizione verra messa in palio per la premiazione della lega.",
+];
+
+const LEAGUE_INFO_LEAGUE_RULES = [
+  "Ogni vittoria da un punto in classifica.",
+  "Alla fine dell'ultima tappa, i primi 8 giocatori si classificheranno alla top per giocarsi i premi finali!",
+  "I premi minimi garantiti saranno 1 biglietto valido per una crociera di 5 giorni con torneo di One Piece a bordo (con ricchi premi), box di OP09 e box di OP13.",
+  "Superato il minimo di partecipanti, tutto il buono verra convertito in premio con box dell'espansione prossima all'uscita, la piu' recente possibile.",
+  "Contano tutti i risultati!",
+];
+
 const medalColors = [
   "text-yellow-300 drop-shadow-[0_0_6px_rgba(250,204,21,0.75)]",
   "text-cyan-200 drop-shadow-[0_0_6px_rgba(125,211,252,0.65)]",
@@ -785,6 +802,7 @@ export default function App() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [nextEventLink, setNextEventLink] = useState("");
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
+  const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
   const sharedSetters = {
     setLeaderboardEntries,
     setRoundColumns,
@@ -821,7 +839,7 @@ export default function App() {
           roundResults[roundNumber] = result;
           totalWins += result.wins;
           totalLosses += result.losses;
-          totalPoints += result.wins * 3;
+          totalPoints += result.wins;
         }
       });
 
@@ -1208,20 +1226,52 @@ export default function App() {
                 <Waves className="h-5 w-5 text-amber-200" />
                 <h2 className="text-xl font-semibold text-white">League Info</h2>
               </div>
-              <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-                <div className="overflow-hidden rounded-2xl border border-cyan-200/30 bg-blue-950/55 p-2 shadow-[0_10px_30px_rgba(34,211,238,0.2)]">
-                  <img src="/leagueinfo.jpeg" alt="League info" className="h-full w-full rounded-xl object-cover" />
-                </div>
-                <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
-                  <h3 className="mb-3 text-lg font-semibold text-amber-100">Round Calendar</h3>
-                  <ul className="space-y-2">
-                    {LEAGUE_ROUND_CALENDAR.map((roundDate, index) => (
-                      <li key={roundDate} className="flex items-center justify-between rounded-lg border border-blue-200/20 bg-blue-950/35 px-3 py-2 text-sm">
-                        <span className="text-cyan-100">Round {index + 1}</span>
-                        <span className="font-semibold text-amber-100">{roundDate}</span>
-                      </li>
-                    ))}
-                  </ul>
+              <div className="space-y-4">
+                <div className="grid gap-4 lg:grid-cols-[360px_1fr] lg:items-start">
+                  <div className="lg:sticky lg:top-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsLeagueImageOpen(true)}
+                      className="block w-full overflow-hidden rounded-xl transition hover:opacity-95"
+                    >
+                      <img src="/leagueinfo.jpeg" alt="League info" className="w-full rounded-xl object-contain" />
+                    </button>
+                  </div>
+                  <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+                    <div className="space-y-4">
+                  <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
+                    <h3 className="mb-3 text-lg font-semibold text-amber-100">Info Torneo</h3>
+                    <ul className="space-y-2 text-sm leading-relaxed text-cyan-50/92">
+                      {LEAGUE_INFO_RULES.map((rule) => (
+                        <li key={rule}>
+                          {rule}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-[#7a1f35]/75 via-[#6b3f1d]/70 to-[#173b7d]/75 p-4">
+                    <h3 className="mb-3 text-lg font-semibold text-amber-100">Regole Lega One Piece</h3>
+                    <ul className="space-y-2 text-sm leading-relaxed text-amber-50/95">
+                      {LEAGUE_INFO_LEAGUE_RULES.map((rule) => (
+                        <li key={rule}>
+                          {rule}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                    </div>
+                    <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
+                      <h3 className="mb-3 text-lg font-semibold text-amber-100">Round Calendar</h3>
+                      <ul className="space-y-2">
+                        {LEAGUE_ROUND_CALENDAR.map((roundDate, index) => (
+                          <li key={roundDate} className="flex items-center justify-between rounded-lg border border-blue-200/20 bg-blue-950/35 px-3 py-2 text-sm">
+                            <span className="text-cyan-100">Round {index + 1}</span>
+                            <span className="font-semibold text-amber-100">{roundDate}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.section>
@@ -1282,6 +1332,25 @@ export default function App() {
           ) : null}
         </AnimatePresence>
       </div>
+      {isLeagueImageOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-sm"
+          onClick={() => setIsLeagueImageOpen(false)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full border border-white/20 bg-slate-900/70 px-3 py-1 text-sm text-white transition hover:bg-slate-800"
+            onClick={() => setIsLeagueImageOpen(false)}
+          >
+            Close
+          </button>
+          <img
+            src="/leagueinfo.jpeg"
+            alt="League info enlarged"
+            className="max-h-[90vh] max-w-[92vw] rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
+          />
+        </div>
+      ) : null}
     </main>
   );
 }
