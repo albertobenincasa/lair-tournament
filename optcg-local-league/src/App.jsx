@@ -107,6 +107,27 @@ function buildDonutPath({ cx, cy, innerRadius, outerRadius, startAngle, endAngle
   ].join(" ");
 }
 
+function buildArcStrokePath({ cx, cy, radius, startAngle, endAngle, explode = 0 }) {
+  const midAngle = (startAngle + endAngle) / 2;
+  const explodeRadians = (midAngle - 90) * DEG2RAD;
+  const shiftX = Math.cos(explodeRadians) * explode;
+  const shiftY = Math.sin(explodeRadians) * explode;
+  const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+
+  const start = polarToCartesian(cx + shiftX, cy + shiftY, radius, startAngle);
+  const end = polarToCartesian(cx + shiftX, cy + shiftY, radius, endAngle);
+
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+}
+
+function getExplodeShift(midAngle, explode) {
+  const explodeRadians = (midAngle - 90) * DEG2RAD;
+  return {
+    x: Math.cos(explodeRadians) * explode,
+    y: Math.sin(explodeRadians) * explode,
+  };
+}
+
 function parseCsvLine(line) {
   const result = [];
   let current = "";
@@ -510,7 +531,8 @@ function RoundDeckPieChart({ entries }) {
     center: 160,
     outerRadius: 118,
     innerRadius: 68,
-    explode: 6,
+    explode: 2,
+    gapDegrees: 0.7,
   };
 
   return (
@@ -524,6 +546,12 @@ function RoundDeckPieChart({ entries }) {
           viewBox={`0 0 ${chartConfig.viewBox} ${chartConfig.viewBox}`}
           className="h-64 w-64"
         >
+          <defs>
+            <filter id="deckDonutShadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="rgba(0,0,0,0.55)" />
+              <feDropShadow dx="0" dy="0" stdDeviation="1.6" floodColor="rgba(56,189,248,0.18)" />
+            </filter>
+          </defs>
           <circle
             cx={chartConfig.center}
             cy={chartConfig.center}
@@ -538,14 +566,19 @@ function RoundDeckPieChart({ entries }) {
             const isHovered = hoveredTooltip?.key === segmentKey;
             const paletteColors = segment.palette.map((colorName) => optcgColorHex[colorName] ?? optcgColorHex.blue);
             const arcSpan = segment.endAngle - segment.startAngle;
-            const splitAngle = segment.startAngle + arcSpan / 2;
+            const padding = Math.min(chartConfig.gapDegrees, Math.max(0, arcSpan / 6));
+            const arcStart = segment.startAngle + padding;
+            const arcEnd = segment.endAngle - padding;
+            const arcSpanPadded = Math.max(0, arcEnd - arcStart);
+            const splitAngle = arcStart + arcSpanPadded / 2;
+            const explodeAmount = isHovered ? chartConfig.explode : 0;
             const subSlices =
               paletteColors.length === 2
                 ? [
-                    { startAngle: segment.startAngle, endAngle: splitAngle, color: paletteColors[0] },
-                    { startAngle: splitAngle, endAngle: segment.endAngle, color: paletteColors[1] },
+                    { startAngle: arcStart, endAngle: splitAngle, color: paletteColors[0] },
+                    { startAngle: splitAngle, endAngle: arcEnd, color: paletteColors[1] },
                   ]
-                : [{ startAngle: segment.startAngle, endAngle: segment.endAngle, color: paletteColors[0] }];
+                : [{ startAngle: arcStart, endAngle: arcEnd, color: paletteColors[0] }];
 
             return (
               <g
@@ -576,13 +609,17 @@ function RoundDeckPieChart({ entries }) {
                       cy: chartConfig.center,
                       innerRadius: chartConfig.innerRadius,
                       outerRadius: chartConfig.outerRadius,
-                      startAngle: subSlice.startAngle + 0.6,
-                      endAngle: subSlice.endAngle - 0.6,
-                      explode: chartConfig.explode,
+                      startAngle: subSlice.startAngle,
+                      endAngle: subSlice.endAngle,
+                      explode: explodeAmount,
                     })}
                     fill={subSlice.color}
-                    stroke={isHovered ? "rgba(255,255,255,0.95)" : "rgba(15,23,42,0.8)"}
-                    strokeWidth={isHovered ? "2.5" : "1.5"}
+                    filter="url(#deckDonutShadow)"
+                    stroke={isHovered ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.18)"}
+                    strokeWidth={isHovered ? "2" : "1"}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    opacity={total === 0 ? 0.25 : 1}
                   />
                 ))}
 
@@ -592,7 +629,7 @@ function RoundDeckPieChart({ entries }) {
                       polarToCartesian(
                         chartConfig.center,
                         chartConfig.center,
-                        (chartConfig.outerRadius + chartConfig.innerRadius) / 2 + 7,
+                        (chartConfig.outerRadius + chartConfig.innerRadius) / 2 + 6,
                         (segment.startAngle + segment.endAngle) / 2
                       ).x
                     }
@@ -600,19 +637,19 @@ function RoundDeckPieChart({ entries }) {
                       polarToCartesian(
                         chartConfig.center,
                         chartConfig.center,
-                        (chartConfig.outerRadius + chartConfig.innerRadius) / 2 + 7,
+                        (chartConfig.outerRadius + chartConfig.innerRadius) / 2 + 6,
                         (segment.startAngle + segment.endAngle) / 2
                       ).y
                     }
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill="#ffffff"
-                    fontSize="10"
-                    fontWeight="700"
+                    fontSize="16"
+                    fontWeight="800"
                     style={{
                       paintOrder: "stroke",
                       stroke: "rgba(2,6,23,0.9)",
-                      strokeWidth: "2.5px",
+                      strokeWidth: "4px",
                     }}
                   >
                     {Math.round(segment.percentage)}%
@@ -653,18 +690,18 @@ function RoundDeckPieChart({ entries }) {
         </motion.svg>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {segments.map((segment) => (
           <div
             key={`${segment.leader}-${segment.segmentIndex}`}
-            className="grid grid-cols-[64px_1fr_52px_56px] items-center gap-2 rounded-lg border border-blue-300/15 bg-blue-950/35 px-3 py-2"
+            className="grid grid-cols-[56px_1fr_44px_44px] items-center gap-2 rounded-lg border border-blue-300/12 bg-blue-950/28 px-2.5 py-2"
           >
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               {segment.image ? (
                 <img
                   src={segment.image}
                   alt={segment.leader}
-                  className="h-7 w-7 rounded-md border border-white/25 object-cover"
+                  className="h-7 w-7 rounded-md border border-white/20 bg-slate-900/40 object-contain"
                   loading="lazy"
                 />
               ) : null}
@@ -672,21 +709,20 @@ function RoundDeckPieChart({ entries }) {
                 {segment.palette.map((colorName) => (
                   <span
                     key={`${segment.leader}-${colorName}`}
-                    className="h-3.5 w-3.5 rounded-sm border border-white/35"
+                    className="h-3 w-3 rounded-[3px] border border-white/25"
                     style={{ backgroundColor: optcgColorHex[colorName] ?? optcgColorHex.blue }}
                   />
                 ))}
               </span>
             </span>
-            <span className="truncate text-sm text-blue-100">
-              {segment.leader}
-              <span className="ml-2 text-xs text-blue-100/60">
-                {segment.code ? `(${segment.code}) ` : ""}
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-blue-50">{segment.leader}</span>
+              <span className="block truncate text-xs text-blue-100/60">
                 {segment.colorLabel}
               </span>
             </span>
-            <span className="text-right text-sm font-semibold text-yellow-200">{segment.count}</span>
-            <span className="text-right text-xs text-cyan-100/85">{Math.round(segment.percentage)}%</span>
+            <span className="text-right text-sm font-semibold tabular-nums text-yellow-200">{segment.count}</span>
+            <span className="text-right text-xs font-medium tabular-nums text-cyan-100/85">{Math.round(segment.percentage)}%</span>
           </div>
         ))}
       </div>
@@ -705,7 +741,7 @@ function RoundDeckPieChart({ entries }) {
               <img
                 src={hoveredTooltip.segment.image}
                 alt={hoveredTooltip.segment.leader}
-                className="h-16 w-16 shrink-0 rounded-lg border border-white/25 object-cover"
+                className="h-16 w-16 shrink-0 rounded-lg border border-white/25 bg-slate-900/40 object-contain"
                 loading="lazy"
               />
             ) : (
@@ -852,6 +888,7 @@ export default function App() {
         playerId: entry.key,
         name: entry.name,
         memberNumber: entry.memberNumber ?? "",
+        seedRank: Number.isFinite(entry.seedRank) ? entry.seedRank : null,
         points: totalPoints,
         wins,
         losses,
@@ -863,7 +900,13 @@ export default function App() {
 
   const rankingsWithPosition = useMemo(() => {
     return [...mergedRankings]
-      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+      .sort((a, b) => {
+        const pointDiff = b.points - a.points;
+        if (pointDiff !== 0) return pointDiff;
+        const rankA = a.seedRank ?? Number.POSITIVE_INFINITY;
+        const rankB = b.seedRank ?? Number.POSITIVE_INFINITY;
+        return rankA - rankB;
+      })
       .map((entry, index) => ({
         ...entry,
         position: index + 1,
@@ -1008,7 +1051,8 @@ export default function App() {
       rows.forEach((row) => {
         const normalizedRow = toNormalizedCsvRow(row);
         let rawName = getCsvField(normalizedRow, ["name", "player name", "player", "nickname"]);
-        let memberNumber = getCsvField(normalizedRow, ["member number", "bandai id", "bandaiid", "id"]);
+        let memberNumber = getCsvField(normalizedRow, ["member number", "member", "bandai id", "bandaiid", "id"]);
+        const rankingValue = Number.parseInt(getCsvField(normalizedRow, ["ranking", "rank", "position"]), 10);
 
         if (isLikelyBandaiId(rawName) && hasLetters(memberNumber)) {
           [rawName, memberNumber] = [memberNumber, rawName];
@@ -1031,6 +1075,7 @@ export default function App() {
             key: memberNumber ? `member:${memberNumber}` : `name:${normalizedName}`,
             memberNumber,
             name: rawName,
+            seedRank: Number.isNaN(rankingValue) ? null : rankingValue,
             roundResults: {},
             roundLeaders: {},
           };
@@ -1041,6 +1086,9 @@ export default function App() {
         if (memberNumber) {
           existing.memberNumber = memberNumber;
           existing.key = `member:${memberNumber}`;
+        }
+        if (!Number.isNaN(rankingValue)) {
+          existing.seedRank = rankingValue;
         }
         const wins = Math.max(0, Math.min(5, Math.round(points / 3)));
         const losses = 5 - wins;
