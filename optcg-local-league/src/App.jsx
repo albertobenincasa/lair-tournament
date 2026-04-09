@@ -839,6 +839,7 @@ export default function App() {
   const [nextEventLink, setNextEventLink] = useState("");
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
   const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
+  const [matchesPerRoundUpload, setMatchesPerRoundUpload] = useState(5);
   const sharedSetters = {
     setLeaderboardEntries,
     setRoundColumns,
@@ -1035,6 +1036,7 @@ export default function App() {
       }
 
       const nextRound = (roundColumns[roundColumns.length - 1] ?? 0) + 1;
+      const matchesPerRound = Math.max(1, Math.min(12, Math.round(matchesPerRoundUpload || 5)));
       const nextEntries = leaderboardEntries.map((entry) => ({
         ...entry,
         roundResults: { ...entry.roundResults },
@@ -1090,8 +1092,8 @@ export default function App() {
         if (!Number.isNaN(rankingValue)) {
           existing.seedRank = rankingValue;
         }
-        const wins = Math.max(0, Math.min(5, Math.round(points / 3)));
-        const losses = 5 - wins;
+        const wins = Math.max(0, Math.min(matchesPerRound, Math.round(points / 3)));
+        const losses = matchesPerRound - wins;
         existing.roundResults[nextRound] = { wins, losses, played: true };
         const leaderCode = getCsvField(normalizedRow, ["leader", "leader code", "leadercode"]).toUpperCase();
         existing.roundLeaders[nextRound] = leaderCode;
@@ -1104,7 +1106,7 @@ export default function App() {
           roundColumns: [...roundColumns, nextRound],
           nextEventLink,
         },
-        `Round ${nextRound} uploaded successfully (${rows.length} rows).`
+        `Round ${nextRound} uploaded successfully (${rows.length} rows, ${matchesPerRound} matches).`
       );
       event.target.value = "";
     } catch {
@@ -1289,6 +1291,9 @@ export default function App() {
                     <div className="space-y-4">
                   <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
                     <h3 className="mb-3 text-lg font-semibold text-amber-100">Info Torneo</h3>
+                    <p className="mb-4 rounded-lg border border-amber-200/35 bg-amber-300/15 px-3 py-2 text-base font-semibold leading-snug text-yellow-100 sm:text-lg">
+                      Per entrare in top 8 saranno calcolati i 6 migliori risultati delle 8 tappe in programma.
+                    </p>
                     <ul className="space-y-2 text-sm leading-relaxed text-cyan-50/92">
                       {LEAGUE_INFO_RULES.map((rule) => (
                         <li key={rule}>
@@ -1353,6 +1358,36 @@ export default function App() {
                       >
                         Clear all (test)
                       </button>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <label className="inline-flex items-center gap-2 text-xs text-blue-100/85">
+                        Matches per uploaded round
+                        <input
+                          type="number"
+                          min="1"
+                          max="12"
+                          step="1"
+                          value={matchesPerRoundUpload}
+                          onChange={(event) => setMatchesPerRoundUpload(Number.parseInt(event.target.value || "5", 10) || 5)}
+                          className="w-16 rounded-md border border-blue-200/25 bg-blue-950/50 px-2 py-1 text-right text-xs text-blue-100"
+                        />
+                      </label>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setMatchesPerRoundUpload(5)}
+                          className="rounded-md border border-blue-200/25 bg-blue-950/50 px-2 py-1 text-[11px] text-blue-100 transition hover:border-amber-200/60 hover:text-amber-100"
+                        >
+                          Set 5
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMatchesPerRoundUpload(6)}
+                          className="rounded-md border border-blue-200/25 bg-blue-950/50 px-2 py-1 text-[11px] text-blue-100 transition hover:border-amber-200/60 hover:text-amber-100"
+                        >
+                          Set 6
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <input
