@@ -844,7 +844,6 @@ export default function App() {
   const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
   const [matchesPerRoundUpload, setMatchesPerRoundUpload] = useState(5);
   const [prizesStepPreview, setPrizesStepPreview] = useState(null);
-  const [manualUnlockedOp16, setManualUnlockedOp16] = useState(0);
   const [basketOp16Sprites, setBasketOp16Sprites] = useState([]);
   const prevEffectiveUnlockedRef = useRef(0);
   const hasPlayedPrizesIntroRef = useRef(false);
@@ -995,7 +994,7 @@ export default function App() {
 
   const effectivePrizeStep = prizesStepPreview ?? top8PrizeBank.progressToNextBox;
   const effectivePrizeProgressPercent = Math.round((effectivePrizeStep / 24) * 100);
-  const effectiveUnlockedOp16 = top8PrizeBank.unlockedOp16Boxes + manualUnlockedOp16;
+  const effectiveUnlockedOp16 = top8PrizeBank.unlockedOp16Boxes;
   const op16PathT = Math.max(0, Math.min(1, effectivePrizeStep / 23));
   const op16PathXPercent = Math.round(-30 + op16PathT * 90);
   const op16PathYpx = Math.round(18 + 34 * (1 - 4 * (op16PathT - 0.5) * (op16PathT - 0.5)));
@@ -1550,28 +1549,35 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="relative z-10 rounded-xl bg-transparent p-3">
-                    <div className="relative mx-auto h-56 w-full max-w-[360px]">
-                      <img
-                        src="/prizes/msc.png"
-                        alt="MSC"
-                        className="absolute left-[10%] top-[12%] h-24 w-24 rotate-[-8deg] object-contain"
-                      />
-                      <img
-                        src="/prizes/OP09-removebg-preview.png"
-                        alt="Box OP09"
-                        className="absolute right-[8%] top-[18%] h-24 w-24 rotate-[10deg] object-contain"
-                      />
-                      <img
-                        src="/prizes/OP13-removebg-preview.png"
-                        alt="Box OP13"
-                        className="absolute left-[22%] bottom-[8%] h-24 w-24 rotate-[6deg] object-contain"
-                      />
-                      <img
-                        src="/prizes/OP16-removebg-preview.png"
-                        alt="Box OP16"
-                        className="absolute right-[18%] bottom-[6%] h-24 w-24 rotate-[-10deg] object-contain"
-                      />
+                  <div className="relative z-10 bg-transparent p-3">
+                    <div className="relative mx-auto w-full max-w-[380px]">
+                      <div className="relative h-56 overflow-visible">
+                        <img
+                          src="/GITF.png"
+                          alt="Pacco regalo"
+                          className="pointer-events-none absolute inset-0 h-full w-full origin-center object-cover scale-[1.22]"
+                        />
+                        <div className="absolute inset-x-[10%] top-[18%] bottom-[18%]">
+                          <img
+                            src="/prizes/msc.png"
+                            alt="MSC"
+                            className="absolute left-[6%] top-[2%] h-24 w-24 rotate-[-8deg] object-contain"
+                          />
+                          <img
+                            src="/prizes/OP09-removebg-preview.png"
+                            alt="Box OP09"
+                            className="absolute right-[2%] top-[10%] h-24 w-24 rotate-[10deg] object-contain"
+                          />
+                          <img
+                            src="/prizes/OP13-removebg-preview.png"
+                            alt="Box OP13"
+                            className="absolute left-[16%] bottom-[2%] h-24 w-24 rotate-[6deg] object-contain"
+                          />
+                          <img
+                            src="/prizes/OP16-removebg-preview.png"
+                            alt="Box OP16"
+                            className="absolute right-[14%] bottom-[0%] h-24 w-24 rotate-[-10deg] object-contain"
+                          />
                       {basketOp16Sprites.map((sprite) => (
                         <img
                           key={sprite.id}
@@ -1581,43 +1587,11 @@ export default function App() {
                           style={{ left: sprite.left, top: sprite.top, transform: `translate(-50%, -50%) rotate(${sprite.rotate})` }}
                         />
                       ))}
+                        </div>
+                      </div>
                     </div>
                     <p className="text-center text-sm font-semibold text-cyan-50/95">Cestino premi</p>
                   </div>
-                </div>
-
-                <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPrizesStepPreview((current) => {
-                        const base = typeof current === "number" ? current : top8PrizeBank.progressToNextBox;
-                        return (base + 1) % 24;
-                      })
-                    }
-                    className="rounded-full border border-amber-200/35 bg-blue-950/35 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70"
-                  >
-                    Avanza di 1
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualUnlockedOp16((current) => current + 1)}
-                    className="rounded-full border border-amber-200/35 bg-blue-950/35 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70"
-                  >
-                    Aggiungi OP16
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPrizesStepPreview(null);
-                      setManualUnlockedOp16(0);
-                      setBasketOp16Sprites([]);
-                    }}
-                    className="rounded-full border border-blue-200/20 bg-blue-950/20 px-3 py-1 text-xs font-semibold text-cyan-50/90 transition hover:border-blue-200/40"
-                  >
-                    Reset
-                  </button>
-                  <span className="text-xs font-semibold text-cyan-50/85">Progresso: {effectivePrizeStep}</span>
                 </div>
 
                 <div className="mb-3 rounded-xl border border-amber-200/35 bg-blue-950/35 px-3 py-3">
