@@ -1508,9 +1508,9 @@ export default function App() {
               <div className="rounded-2xl border border-amber-200/35 bg-gradient-to-br from-[#173b7d]/80 via-[#7a1f35]/65 to-[#6b3f1d]/70 p-4 shadow-[0_10px_30px_rgba(2,6,23,0.3)]">
                 <h3 className="mb-3 text-lg font-semibold text-amber-100">Salvadanaio Premi Top 8</h3>
 
-                <div className="relative mb-4 grid gap-4 lg:grid-cols-[1fr_minmax(260px,1fr)_1fr] lg:items-end">
+                <div className="relative mb-4 grid items-end gap-3 sm:gap-4 md:grid-cols-[1fr_minmax(220px,0.9fr)_1fr]">
                   <svg
-                    className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+                    className="pointer-events-none absolute inset-0 z-0 hidden md:block"
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                   >
@@ -1533,14 +1533,14 @@ export default function App() {
                   </svg>
 
                   <div className="relative z-10 rounded-xl bg-transparent p-3">
-                    <img src="/lair_throw.png" alt="Lair throw" className="mx-auto h-52 w-full object-contain" />
+                    <img src="/lair_throw.png" alt="Lair throw" className="mx-auto h-40 w-full object-contain sm:h-48 lg:h-52" />
                   </div>
 
-                  <div className="relative z-10 hidden h-full min-h-[240px] overflow-visible rounded-xl lg:block">
+                  <div className="relative z-10 h-[180px] overflow-visible rounded-xl sm:h-[220px] md:h-full md:min-h-[240px]">
                     <motion.img
                       src="/prizes/OP16-removebg-preview.png"
                       alt="Box OP16 in movimento"
-                      className="absolute bottom-2 z-10 h-44 w-44 object-contain drop-shadow-[0_16px_28px_rgba(2,6,23,0.5)]"
+                      className="absolute bottom-0 z-10 h-28 w-28 object-contain drop-shadow-[0_16px_28px_rgba(2,6,23,0.5)] sm:h-36 sm:w-36 md:bottom-2 md:h-44 md:w-44"
                       animate={{
                         left: `${op16PathXPercent}%`,
                         bottom: `${op16PathYpx}px`,
@@ -1550,40 +1550,40 @@ export default function App() {
                   </div>
 
                   <div className="relative z-10 bg-transparent p-3">
-                    <div className="relative mx-auto w-full max-w-[380px]">
-                      <div className="relative h-56 overflow-visible">
+                    <div className="relative mx-auto w-full max-w-[360px] sm:max-w-[380px]">
+                      <div className="relative h-44 overflow-visible sm:h-56">
                         <img
                           src="/GITF.png"
                           alt="Pacco regalo"
-                          className="pointer-events-none absolute inset-0 h-full w-full origin-center object-cover scale-[1.22]"
+                          className="pointer-events-none absolute inset-0 h-full w-full origin-center object-cover scale-[1.12] sm:scale-[1.18] lg:scale-[1.22]"
                         />
-                        <div className="absolute inset-x-[10%] top-[18%] bottom-[18%]">
+                        <div className="absolute inset-x-[14%] top-[20%] bottom-[16%] sm:inset-x-[12%] sm:top-[18%] sm:bottom-[18%] lg:inset-x-[10%]">
                           <img
                             src="/prizes/msc.png"
                             alt="MSC"
-                            className="absolute left-[6%] top-[2%] h-24 w-24 rotate-[-8deg] object-contain"
+                            className="absolute left-[6%] top-[2%] h-20 w-20 rotate-[-8deg] object-contain sm:h-24 sm:w-24"
                           />
                           <img
                             src="/prizes/OP09-removebg-preview.png"
                             alt="Box OP09"
-                            className="absolute right-[2%] top-[10%] h-24 w-24 rotate-[10deg] object-contain"
+                            className="absolute right-[2%] top-[10%] h-20 w-20 rotate-[10deg] object-contain sm:h-24 sm:w-24"
                           />
                           <img
                             src="/prizes/OP13-removebg-preview.png"
                             alt="Box OP13"
-                            className="absolute left-[16%] bottom-[2%] h-24 w-24 rotate-[6deg] object-contain"
+                            className="absolute left-[16%] bottom-[2%] h-20 w-20 rotate-[6deg] object-contain sm:h-24 sm:w-24"
                           />
                           <img
                             src="/prizes/OP16-removebg-preview.png"
                             alt="Box OP16"
-                            className="absolute right-[14%] bottom-[0%] h-24 w-24 rotate-[-10deg] object-contain"
+                            className="absolute right-[14%] bottom-[0%] h-20 w-20 rotate-[-10deg] object-contain sm:h-24 sm:w-24"
                           />
                       {basketOp16Sprites.map((sprite) => (
                         <img
                           key={sprite.id}
                           src="/prizes/OP16-removebg-preview.png"
                           alt="Box OP16 aggiunto"
-                          className="pointer-events-none absolute h-24 w-24 object-contain opacity-95 drop-shadow-[0_10px_16px_rgba(2,6,23,0.45)]"
+                          className="pointer-events-none absolute h-20 w-20 object-contain opacity-95 drop-shadow-[0_10px_16px_rgba(2,6,23,0.45)] sm:h-24 sm:w-24"
                           style={{ left: sprite.left, top: sprite.top, transform: `translate(-50%, -50%) rotate(${sprite.rotate})` }}
                         />
                       ))}
