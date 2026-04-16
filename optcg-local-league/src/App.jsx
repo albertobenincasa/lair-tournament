@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Anchor,
   ChevronDown,
   ChevronUp,
   Compass,
+  Gift,
   Medal,
+  Sparkles,
   Swords,
   Trophy,
   Waves,
@@ -18,6 +20,7 @@ const tabs = [
   { key: "rankings", label: "Rankings", icon: Trophy },
   { key: "decks", label: "Decks", icon: Swords },
   { key: "league-info", label: "League Info", icon: Waves },
+  { key: "prizes", label: "Prizes", icon: Gift },
 ];
 
 const LEAGUE_ROUND_CALENDAR = [
@@ -840,6 +843,11 @@ export default function App() {
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
   const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
   const [matchesPerRoundUpload, setMatchesPerRoundUpload] = useState(5);
+  const [prizesStepPreview, setPrizesStepPreview] = useState(null);
+  const [manualUnlockedOp16, setManualUnlockedOp16] = useState(0);
+  const [basketOp16Sprites, setBasketOp16Sprites] = useState([]);
+  const prevEffectiveUnlockedRef = useRef(0);
+  const hasPlayedPrizesIntroRef = useRef(false);
   const sharedSetters = {
     setLeaderboardEntries,
     setRoundColumns,
@@ -960,6 +968,163 @@ export default function App() {
       return { round: roundNumber, entries };
     });
   }, [leaderboardEntries, roundColumns]);
+
+  const top8PrizeBank = useMemo(() => {
+    const perRound = roundColumns.map((roundNumber) => {
+      let players = 0;
+      leaderboardEntries.forEach((entry) => {
+        if (entry.roundResults?.[roundNumber]?.played) players += 1;
+      });
+      const extraPlayers = Math.max(0, players - 20);
+      return { roundNumber, players, extraPlayers };
+    });
+
+    const accumulatedExtraPlayers = perRound.reduce((acc, item) => acc + item.extraPlayers, 0);
+    const unlockedOp16Boxes = Math.floor(accumulatedExtraPlayers / 24);
+    const progressToNextBox = accumulatedExtraPlayers % 24;
+    const progressPercent = Math.round((progressToNextBox / 24) * 100);
+
+    return {
+      perRound,
+      accumulatedExtraPlayers,
+      unlockedOp16Boxes,
+      progressToNextBox,
+      progressPercent,
+    };
+  }, [leaderboardEntries, roundColumns]);
+
+  const effectivePrizeStep = prizesStepPreview ?? top8PrizeBank.progressToNextBox;
+  const effectivePrizeProgressPercent = Math.round((effectivePrizeStep / 24) * 100);
+  const effectiveUnlockedOp16 = top8PrizeBank.unlockedOp16Boxes + manualUnlockedOp16;
+  const op16PathT = Math.max(0, Math.min(1, effectivePrizeStep / 23));
+  const op16PathXPercent = Math.round(-30 + op16PathT * 90);
+  const op16PathYpx = Math.round(18 + 34 * (1 - 4 * (op16PathT - 0.5) * (op16PathT - 0.5)));
+
+  function createRandomBasketOp16Sprite(existingSprites) {
+    // All OP16 sprites are 96px (h-24 w-24). We try strict spacing first,
+    // then relax progressively so we still place new sprites with variety.
+    const MIN_DISTANCE_STEPS_PX = [104, 92, 82, 72, 62, 54];
+
+    // Approximate the basket area size (matches `h-56` + `max-w-[360px]`).
+    const approxWidth = 360;
+    const approxHeight = 224;
+
+    // We store sprites as CENTER points (because we render them with translate(-50%, -50%)).
+    const existingPoints = (existingSprites ?? []).map((sprite) => ({
+      x: sprite.xPercent,
+      y: sprite.yPercent,
+    }));
+
+    // Approximate centers of the 4 "base" images, to avoid overlapping them too.
+    const baseCenters = [
+      { x: 23, y: 33 }, // MSC (left 10%, top 12%)
+      { x: 79, y: 39 }, // OP09 (right 8%, top 18%)
+      { x: 35, y: 70 }, // OP13 (left 22%, bottom 8%)
+      { x: 69, y: 72 }, // OP16 (right 18%, bottom 6%)
+    ];
+
+    const points = [...existingPoints, ...baseCenters].filter(
+      (p) => Number.isFinite(p.x) && Number.isFinite(p.y)
+    );
+
+    const toPx = (p) => ({ x: (p.x / 100) * approxWidth, y: (p.y / 100) * approxHeight });
+    const isFarEnough = (candidate, minDistancePx) => {
+      const c = toPx(candidate);
+      return points.every((p) => {
+        const pp = toPx(p);
+        return Math.hypot(c.x - pp.x, c.y - pp.y) >= minDistancePx;
+      });
+    };
+
+    // Start inside the basket, but if it becomes crowded we allow slight overflow.
+    const boundsList = [
+      { minX: 12, maxX: 88, minY: 12, maxY: 88 },
+      { minX: 4, maxX: 96, minY: 6, maxY: 94 },
+      { minX: -6, maxX: 106, minY: -8, maxY: 108 },
+    ];
+
+    let chosen = null;
+    for (const minDistance of MIN_DISTANCE_STEPS_PX) {
+      for (const bounds of boundsList) {
+        for (let attempt = 0; attempt < 220; attempt += 1) {
+          const candidate = {
+            x: bounds.minX + Math.random() * (bounds.maxX - bounds.minX),
+            y: bounds.minY + Math.random() * (bounds.maxY - bounds.minY),
+          };
+          if (isFarEnough(candidate, minDistance)) {
+            chosen = candidate;
+            break;
+          }
+        }
+        if (chosen) break;
+      }
+      if (chosen) break;
+    }
+
+    // If it's extremely crowded, still pick a randomized position (never identical),
+    // preferring the widest bounds.
+    if (!chosen) {
+      const widest = boundsList[boundsList.length - 1];
+      chosen = {
+        x: widest.minX + Math.random() * (widest.maxX - widest.minX),
+        y: widest.minY + Math.random() * (widest.maxY - widest.minY),
+      };
+    }
+
+    return {
+      id: `op16-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      left: `${chosen.x}%`,
+      top: `${chosen.y}%`,
+      xPercent: chosen.x,
+      yPercent: chosen.y,
+      rotate: `${-18 + Math.random() * 36}deg`,
+    };
+  }
+
+  useEffect(() => {
+    const prev = prevEffectiveUnlockedRef.current;
+    const next = effectiveUnlockedOp16;
+
+    if (next > prev) {
+      const amountToAdd = next - prev;
+      setBasketOp16Sprites((current) => {
+        const nextSprites = [...current];
+        for (let i = 0; i < amountToAdd; i += 1) {
+          const sprite = createRandomBasketOp16Sprite(nextSprites);
+          nextSprites.push(sprite);
+        }
+        return nextSprites;
+      });
+    } else if (next < prev) {
+      const amountToRemove = prev - next;
+      setBasketOp16Sprites((current) => current.slice(0, Math.max(0, current.length - amountToRemove)));
+    }
+
+    prevEffectiveUnlockedRef.current = next;
+  }, [effectiveUnlockedOp16]);
+
+  useEffect(() => {
+    if (activeTab !== "prizes") return;
+    if (hasPlayedPrizesIntroRef.current) return;
+    hasPlayedPrizesIntroRef.current = true;
+
+    const target = top8PrizeBank.progressToNextBox;
+    setPrizesStepPreview(0);
+
+    let current = 0;
+    const stepMs = 25; // very slow intro: ~15s for 23 steps
+    const intervalId = window.setInterval(() => {
+      if (current >= target) {
+        window.clearInterval(intervalId);
+        window.setTimeout(() => setPrizesStepPreview(null), 900);
+        return;
+      }
+      current += 1;
+      setPrizesStepPreview(current);
+    }, stepMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeTab, top8PrizeBank.progressToNextBox]);
 
   const summaryStats = [
     { label: "Players", value: leaderboardEntries.length },
@@ -1324,6 +1489,154 @@ export default function App() {
                         ))}
                       </ul>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+          ) : null}
+          {activeTab === "prizes" ? (
+            <motion.section
+              key="prizes"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Gift className="h-5 w-5 text-amber-200" />
+                <h2 className="text-xl font-semibold text-white">Prizes</h2>
+              </div>
+              <div className="rounded-2xl border border-amber-200/35 bg-gradient-to-br from-[#173b7d]/80 via-[#7a1f35]/65 to-[#6b3f1d]/70 p-4 shadow-[0_10px_30px_rgba(2,6,23,0.3)]">
+                <h3 className="mb-3 text-lg font-semibold text-amber-100">Salvadanaio Premi Top 8</h3>
+
+                <div className="relative mb-4 grid gap-4 lg:grid-cols-[1fr_minmax(260px,1fr)_1fr] lg:items-end">
+                  <svg
+                    className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d="M 16 72 Q 50 12 84 72"
+                      fill="none"
+                      stroke="rgba(251,191,36,0.55)"
+                      strokeWidth="1.25"
+                      strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    <path
+                      d="M 16 72 Q 50 12 84 72"
+                      fill="none"
+                      stroke="rgba(56,189,248,0.18)"
+                      strokeWidth="3.2"
+                      strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+
+                  <div className="relative z-10 rounded-xl bg-transparent p-3">
+                    <img src="/lair_throw.png" alt="Lair throw" className="mx-auto h-52 w-full object-contain" />
+                  </div>
+
+                  <div className="relative z-10 hidden h-full min-h-[240px] overflow-visible rounded-xl lg:block">
+                    <motion.img
+                      src="/prizes/OP16-removebg-preview.png"
+                      alt="Box OP16 in movimento"
+                      className="absolute bottom-2 z-10 h-44 w-44 object-contain drop-shadow-[0_16px_28px_rgba(2,6,23,0.5)]"
+                      animate={{
+                        left: `${op16PathXPercent}%`,
+                        bottom: `${op16PathYpx}px`,
+                      }}
+                      transition={{ type: "spring", stiffness: 240, damping: 22 }}
+                    />
+                  </div>
+
+                  <div className="relative z-10 rounded-xl bg-transparent p-3">
+                    <div className="relative mx-auto h-56 w-full max-w-[360px]">
+                      <img
+                        src="/prizes/msc.png"
+                        alt="MSC"
+                        className="absolute left-[10%] top-[12%] h-24 w-24 rotate-[-8deg] object-contain"
+                      />
+                      <img
+                        src="/prizes/OP09-removebg-preview.png"
+                        alt="Box OP09"
+                        className="absolute right-[8%] top-[18%] h-24 w-24 rotate-[10deg] object-contain"
+                      />
+                      <img
+                        src="/prizes/OP13-removebg-preview.png"
+                        alt="Box OP13"
+                        className="absolute left-[22%] bottom-[8%] h-24 w-24 rotate-[6deg] object-contain"
+                      />
+                      <img
+                        src="/prizes/OP16-removebg-preview.png"
+                        alt="Box OP16"
+                        className="absolute right-[18%] bottom-[6%] h-24 w-24 rotate-[-10deg] object-contain"
+                      />
+                      {basketOp16Sprites.map((sprite) => (
+                        <img
+                          key={sprite.id}
+                          src="/prizes/OP16-removebg-preview.png"
+                          alt="Box OP16 aggiunto"
+                          className="pointer-events-none absolute h-24 w-24 object-contain opacity-95 drop-shadow-[0_10px_16px_rgba(2,6,23,0.45)]"
+                          style={{ left: sprite.left, top: sprite.top, transform: `translate(-50%, -50%) rotate(${sprite.rotate})` }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-center text-sm font-semibold text-cyan-50/95">Cestino premi</p>
+                  </div>
+                </div>
+
+                <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPrizesStepPreview((current) => {
+                        const base = typeof current === "number" ? current : top8PrizeBank.progressToNextBox;
+                        return (base + 1) % 24;
+                      })
+                    }
+                    className="rounded-full border border-amber-200/35 bg-blue-950/35 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70"
+                  >
+                    Avanza di 1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualUnlockedOp16((current) => current + 1)}
+                    className="rounded-full border border-amber-200/35 bg-blue-950/35 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70"
+                  >
+                    Aggiungi OP16
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrizesStepPreview(null);
+                      setManualUnlockedOp16(0);
+                      setBasketOp16Sprites([]);
+                    }}
+                    className="rounded-full border border-blue-200/20 bg-blue-950/20 px-3 py-1 text-xs font-semibold text-cyan-50/90 transition hover:border-blue-200/40"
+                  >
+                    Reset
+                  </button>
+                  <span className="text-xs font-semibold text-cyan-50/85">Progresso: {effectivePrizeStep}</span>
+                </div>
+
+                <div className="mb-3 rounded-xl border border-amber-200/35 bg-blue-950/35 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-cyan-50/95">
+                      Box OP16 EXTRA per la top 8 aggiunti:{" "}
+                      <span className="font-semibold text-amber-100">{effectiveUnlockedOp16}</span>
+                    </p>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/35 bg-amber-300/15 px-2 py-0.5 text-[11px] font-semibold text-amber-100">
+                      <Sparkles className="h-3 w-3" />
+                      Progresso in corso
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950/55">
+                    <motion.div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#fde68a_0%,#f59e0b_45%,#ef4444_100%)]"
+                      animate={{ width: `${effectivePrizeProgressPercent}%` }}
+                      transition={{ duration: 0.45, ease: "easeOut" }}
+                    />
                   </div>
                 </div>
               </div>
