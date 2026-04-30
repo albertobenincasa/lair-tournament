@@ -843,6 +843,8 @@ export default function App() {
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
   const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
   const [matchesPerRoundUpload, setMatchesPerRoundUpload] = useState(5);
+  const [isWorstTwoModeButtonVisible, setIsWorstTwoModeButtonVisible] = useState(false);
+  const [isWorstTwoModeEnabled, setIsWorstTwoModeEnabled] = useState(false);
   const [prizesStepPreview, setPrizesStepPreview] = useState(null);
   const [basketOp16Sprites, setBasketOp16Sprites] = useState([]);
   const prevEffectiveUnlockedRef = useRef(0);
@@ -872,19 +874,42 @@ export default function App() {
 
   const mergedRankings = useMemo(() => {
     return leaderboardEntries.map((entry) => {
-      const roundResults = {};
+      const allRounds = [];
       let totalPoints = 0;
       let totalWins = 0;
       let totalLosses = 0;
 
       roundColumns.forEach((roundNumber) => {
         const result = entry.roundResults[roundNumber];
-        if (result?.played) {
-          roundResults[roundNumber] = result;
-          totalWins += result.wins;
-          totalLosses += result.losses;
-          totalPoints += result.wins;
-        }
+        allRounds.push({
+          roundNumber,
+          result: result?.played ? result : { wins: 0, losses: 0, played: false, virtualZero: true },
+        });
+      });
+
+      const roundsToCount = (() => {
+        if (!isWorstTwoModeEnabled || allRounds.length <= 2) return allRounds;
+        const sortedByWorst = [...allRounds].sort((a, b) => {
+          const pointDiff = a.result.wins - b.result.wins; // fewer wins = worse
+          if (pointDiff !== 0) return pointDiff;
+          // Missing rounds (virtual 0) are considered worse than played rounds on ties.
+          const playedDiff = Number(b.result.played) - Number(a.result.played);
+          if (playedDiff !== 0) return playedDiff;
+          const lossDiff = b.result.losses - a.result.losses; // more losses = worse
+          if (lossDiff !== 0) return lossDiff;
+          return b.roundNumber - a.roundNumber; // latest round first on tie
+        });
+        const dropped = new Set(sortedByWorst.slice(0, 2).map((x) => x.roundNumber));
+        return allRounds.filter((x) => !dropped.has(x.roundNumber));
+      })();
+
+      const roundResults = {};
+      roundsToCount.forEach(({ roundNumber, result }) => {
+        if (!result.played) return;
+        roundResults[roundNumber] = result;
+        totalWins += result.wins;
+        totalLosses += result.losses;
+        totalPoints += result.wins;
       });
 
       const wins = totalWins;
@@ -904,7 +929,7 @@ export default function App() {
         roundResults,
       };
     });
-  }, [leaderboardEntries, roundColumns]);
+  }, [leaderboardEntries, roundColumns, isWorstTwoModeEnabled]);
 
   const rankingsWithPosition = useMemo(() => {
     return [...mergedRankings]
@@ -1400,9 +1425,24 @@ export default function App() {
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.22 }}
             >
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-300" />
                 <h2 className="text-xl font-semibold text-white">Full Crew Standings</h2>
+                </div>
+                {isUploadUnlocked && isWorstTwoModeButtonVisible ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsWorstTwoModeEnabled((current) => !current)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      isWorstTwoModeEnabled
+                        ? "border-amber-200/70 bg-amber-300/20 text-amber-100"
+                        : "border-blue-200/25 bg-blue-950/35 text-cyan-100/90 hover:border-amber-200/60"
+                    }`}
+                  >
+                    {isWorstTwoModeEnabled ? "Worst 2 hidden" : "Hide worst 2 results"}
+                  </button>
+                ) : null}
               </div>
               <RankingsSection
                 data={sortedRankings}
@@ -1694,6 +1734,21 @@ export default function App() {
                     </div>
                     <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       {uploadStatus ? <p className="text-[11px] text-blue-100/80">{uploadStatus}</p> : null}
+                    </div>
+                    <div className="mt-2 rounded-md border border-blue-200/20 bg-blue-950/35 px-2.5 py-2">
+                      <label className="inline-flex items-center gap-2 text-xs text-blue-100/90">
+                        <input
+                          type="checkbox"
+                          checked={isWorstTwoModeButtonVisible}
+                          onChange={(event) => {
+                            const enabled = event.target.checked;
+                            setIsWorstTwoModeButtonVisible(enabled);
+                            if (!enabled) setIsWorstTwoModeEnabled(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-blue-200/35 bg-blue-950/40"
+                        />
+                        Visible on Rankings panel: hide 2 worst results button
+                      </label>
                     </div>
                   </div>
                 </div>
