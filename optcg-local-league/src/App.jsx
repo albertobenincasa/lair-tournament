@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   Anchor,
   ChevronDown,
@@ -340,10 +340,13 @@ function normalizeSharedState(payload) {
   const safeEntries = Array.isArray(payload?.leaderboardEntries) ? payload.leaderboardEntries : buildInitialEntries();
   const safeRounds = Array.isArray(payload?.roundColumns) ? payload.roundColumns : buildInitialRoundColumns();
   const safeLink = typeof payload?.nextEventLink === "string" ? payload.nextEventLink : "";
+  const safeWorstTwoVisible =
+    typeof payload?.worstTwoButtonVisible === "boolean" ? payload.worstTwoButtonVisible : false;
   return {
     leaderboardEntries: safeEntries,
     roundColumns: safeRounds,
     nextEventLink: safeLink,
+    worstTwoButtonVisible: safeWorstTwoVisible,
   };
 }
 
@@ -370,6 +373,7 @@ function applyLeagueStateToUi(state, setters) {
   setters.setRoundColumns(state.roundColumns);
   setters.setNextEventLink(state.nextEventLink);
   setters.setNextEventLinkInput(state.nextEventLink);
+  if (setters.setWorstTwoButtonVisible) setters.setWorstTwoButtonVisible(state.worstTwoButtonVisible);
 }
 
 async function loadSharedStateToUi(setters, { silent = false } = {}) {
@@ -424,86 +428,115 @@ function SortHeader({ label, sortKey, sortConfig, onSort, className = "" }) {
   );
 }
 
-function RankingsSection({ data, roundColumns, sortConfig, onSort }) {
+const standingsRowLayoutTransition = {
+  type: "spring",
+  stiffness: 380,
+  damping: 34,
+  mass: 0.85,
+};
+
+function RankingsSection({ data, roundColumns, sortConfig, onSort, worstTwoStandingsMode = false }) {
   return (
-    <div className="overflow-hidden rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)]">
+    <motion.div
+      className="overflow-hidden rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)]"
+      animate={{
+        boxShadow: worstTwoStandingsMode
+          ? "0 14px 38px rgba(180,83,9,0.22), 0 0 0 1px rgba(217,119,6,0.2)"
+          : "0 14px 35px rgba(2,6,23,0.25)",
+      }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-max divide-y divide-[#d7c49b]">
-          <thead className="bg-[#e8d7b2]">
-            <tr>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Position" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Bandai ID" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Player" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Points" sortKey="points" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Wins" sortKey="wins" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Losses" sortKey="losses" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">
-                <SortHeader label="Win Rate" sortKey="winRate" sortConfig={sortConfig} onSort={onSort} />
-              </th>
-              {roundColumns.map((roundNumber) => (
-                <th key={`round-col-${roundNumber}`} className="px-3 py-3 text-left">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    R{roundNumber}
-                  </span>
+        <LayoutGroup id="crew-standings-table">
+          <table className="w-full min-w-max divide-y divide-[#d7c49b]">
+            <thead className="bg-[#e8d7b2]">
+              <tr>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Position" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#d7c49b]">
-            {data.map((entry) => {
-              const isTop3 = entry.position <= 3;
-              return (
-                <tr
-                  key={entry.playerId}
-                  className={`transition ${
-                    isTop3
-                      ? "bg-gradient-to-r from-amber-200/80 via-yellow-100/70 to-orange-100/70"
-                      : "hover:bg-amber-100/70"
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm text-slate-800">
-                    <div className="flex items-center gap-2">
-                      {entry.position <= 3 ? (
-                        <Medal className={`h-4 w-4 ${medalColors[entry.position - 1]}`} />
-                      ) : null}
-                      <span>{entry.position}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-800">{entry.memberNumber || "-"}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">{entry.name}</td>
-                  <td className="px-4 py-3 text-sm font-bold text-amber-700">{entry.points}</td>
-                  <td className="px-4 py-3 text-sm text-emerald-800">{formatRatioValue(entry.wins)}</td>
-                  <td className="px-4 py-3 text-sm text-rose-800">{formatRatioValue(entry.losses)}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-sky-900">{entry.winRate}%</td>
-                  {roundColumns.map((roundNumber) => {
-                    const roundResult = entry.roundResults[roundNumber];
-                    return (
-                      <td key={`${entry.playerId}-r${roundNumber}`} className="px-3 py-3 text-sm text-slate-800 whitespace-nowrap">
-                        <span className="inline-block whitespace-nowrap rounded-md border border-[#cab07f] bg-[#efe2c6] px-2 py-1 text-xs leading-none">
-                          {roundResult?.played ? `${roundResult.wins}-${roundResult.losses}` : "0"}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Bandai ID" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Player" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Points" sortKey="points" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Wins" sortKey="wins" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Losses" sortKey="losses" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  <SortHeader label="Win Rate" sortKey="winRate" sortConfig={sortConfig} onSort={onSort} />
+                </th>
+                {roundColumns.map((roundNumber) => (
+                  <th key={`round-col-${roundNumber}`} className="px-3 py-3 text-left">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                      R{roundNumber}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#d7c49b]">
+              {data.map((entry) => {
+                const isTop3 = entry.position <= 3;
+                return (
+                  <motion.tr
+                    key={entry.playerId}
+                    layout="position"
+                    transition={standingsRowLayoutTransition}
+                    className={`transition-colors duration-200 ${
+                      isTop3
+                        ? "bg-gradient-to-r from-amber-200/80 via-yellow-100/70 to-orange-100/70"
+                        : "hover:bg-amber-100/70"
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-sm text-slate-800">
+                      <div className="flex items-center gap-2">
+                        {entry.position <= 3 ? (
+                          <Medal className={`h-4 w-4 ${medalColors[entry.position - 1]}`} />
+                        ) : null}
+                        <span>{entry.position}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-800">{entry.memberNumber || "-"}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{entry.name}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-amber-700">
+                      <motion.span
+                        key={`${entry.playerId}-metrics-${entry.points}-${entry.wins}-${entry.losses}-${entry.winRate}`}
+                        initial={{ scale: 1.1, opacity: 0.55 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        className="inline-block tabular-nums"
+                      >
+                        {entry.points}
+                      </motion.span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-emerald-800 tabular-nums">{formatRatioValue(entry.wins)}</td>
+                    <td className="px-4 py-3 text-sm text-rose-800 tabular-nums">{formatRatioValue(entry.losses)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-sky-900 tabular-nums">{entry.winRate}%</td>
+                    {roundColumns.map((roundNumber) => {
+                      const roundResult = entry.roundResults[roundNumber];
+                      return (
+                        <td key={`${entry.playerId}-r${roundNumber}`} className="px-3 py-3 text-sm text-slate-800 whitespace-nowrap">
+                          <span className="inline-block whitespace-nowrap rounded-md border border-[#cab07f] bg-[#efe2c6] px-2 py-1 text-xs leading-none transition-colors duration-200">
+                            {roundResult?.played ? `${roundResult.wins}-${roundResult.losses}` : "0"}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </motion.tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </LayoutGroup>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -855,6 +888,7 @@ export default function App() {
     setNextEventLink,
     setNextEventLinkInput,
     setUploadStatus,
+    setWorstTwoButtonVisible: setIsWorstTwoModeButtonVisible,
   };
 
   useEffect(() => {
@@ -1294,6 +1328,7 @@ export default function App() {
           leaderboardEntries: nextEntries,
           roundColumns: [...roundColumns, nextRound],
           nextEventLink,
+          worstTwoButtonVisible: isWorstTwoModeButtonVisible,
         },
         `Round ${nextRound} uploaded successfully (${rows.length} rows, ${matchesPerRound} matches).`
       );
@@ -1310,6 +1345,7 @@ export default function App() {
         leaderboardEntries: [],
         roundColumns: [],
         nextEventLink,
+        worstTwoButtonVisible: false,
       },
       "All leaderboard data cleared."
     );
@@ -1328,6 +1364,7 @@ export default function App() {
         leaderboardEntries,
         roundColumns,
         nextEventLink: normalized,
+        worstTwoButtonVisible: isWorstTwoModeButtonVisible,
       },
       "Next event link updated."
     );
@@ -1430,7 +1467,7 @@ export default function App() {
                 <Trophy className="h-5 w-5 text-yellow-300" />
                 <h2 className="text-xl font-semibold text-white">Full Crew Standings</h2>
                 </div>
-                {isUploadUnlocked && isWorstTwoModeButtonVisible ? (
+                {isWorstTwoModeButtonVisible ? (
                   <button
                     type="button"
                     onClick={() => setIsWorstTwoModeEnabled((current) => !current)}
@@ -1449,6 +1486,7 @@ export default function App() {
                 roundColumns={roundColumns}
                 sortConfig={sortConfig}
                 onSort={handleSort}
+                worstTwoStandingsMode={isWorstTwoModeEnabled}
               />
             </motion.section>
           ) : null}
@@ -1741,9 +1779,19 @@ export default function App() {
                           type="checkbox"
                           checked={isWorstTwoModeButtonVisible}
                           onChange={(event) => {
-                            const enabled = event.target.checked;
-                            setIsWorstTwoModeButtonVisible(enabled);
-                            if (!enabled) setIsWorstTwoModeEnabled(false);
+                            const visible = event.target.checked;
+                            setIsWorstTwoModeButtonVisible(visible);
+                            if (!visible) setIsWorstTwoModeEnabled(false);
+                            void persistSharedState(
+                              sharedSetters,
+                              {
+                                leaderboardEntries,
+                                roundColumns,
+                                nextEventLink,
+                                worstTwoButtonVisible: visible,
+                              },
+                              "Ranking controls saved."
+                            );
                           }}
                           className="h-3.5 w-3.5 rounded border-blue-200/35 bg-blue-950/40"
                         />
