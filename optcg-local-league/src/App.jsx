@@ -250,7 +250,7 @@ function italianizeStoricoColumnHeader(header) {
   return header;
 }
 
-const MAX_STORICO_TAPPE = 7;
+const MAX_LEAGUE_TAPPE = 8;
 
 function getTappaOrderFromFileName(fileName) {
   const match = String(fileName ?? "").toUpperCase().match(/TAPPA\s*([0-9]+)/);
@@ -286,8 +286,10 @@ function normalizeStoricoDocuments(value) {
       if (aOrder !== bOrder) return aOrder - bOrder;
       return a.fileName.localeCompare(b.fileName);
     })
-    .filter((doc) => getTappaOrderFromFileName(doc.fileName) <= MAX_STORICO_TAPPE)
-    .slice(0, MAX_STORICO_TAPPE);
+    .filter((doc) => {
+      const order = getTappaOrderFromFileName(doc.fileName);
+      return order <= MAX_LEAGUE_TAPPE;
+    });
 }
 
 function toNormalizedCsvRow(row) {
@@ -1884,7 +1886,7 @@ export default function App() {
                 ...storicoDocuments,
                 {
                   id: `storico-round-${nextRound}-${Date.now()}`,
-                  fileName: file.name,
+                  fileName: `TAPPA${nextRound}.csv`,
                   columns: parsedStorico.displayHeaders,
                   rows: parsedStorico.rows,
                 },
