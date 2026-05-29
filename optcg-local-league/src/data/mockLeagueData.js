@@ -275,5 +275,6 @@ export const leaderColors = {
 };
 
 export const leagueMeta = {
-  leagueName: "Magic Lair League Tournament",
+  leagueName: "La Fantastica Lega del Magic Lair",
+  subtitle: "La classifica della ciurma: tappe, deck e premi finali.",
 };

@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   Anchor,
+  CalendarDays,
   ChevronDown,
   ChevronUp,
   Compass,
+  Crown,
+  Dice5,
   Gift,
   Medal,
   Sparkles,
@@ -17,11 +20,34 @@ import logoNewml from "../logo-newml.png";
 import leaderCatalogData from "../leader_catalog.json";
 
 const tabs = [
-  { key: "rankings", label: "Rankings", icon: Trophy },
-  { key: "decks", label: "Decks", icon: Swords },
-  { key: "league-info", label: "League Info", icon: Waves },
-  { key: "prizes", label: "Prizes", icon: Gift },
+  { key: "top-8", label: "Top 8", icon: Crown },
+  { key: "rankings", label: "Classifica", icon: Trophy },
+  { key: "storico", label: "Storico Giornate", icon: CalendarDays },
+  { key: "decks", label: "Deck", icon: Swords },
+  { key: "league-info", label: "Info Lega", icon: Waves },
+  { key: "prizes", label: "Premi", icon: Gift },
 ];
+
+function compareLeagueStandings(a, b) {
+  const pointDiff = b.points - a.points;
+  if (pointDiff !== 0) return pointDiff;
+
+  const roundsPlayedDiff = (b.roundsPlayed ?? 0) - (a.roundsPlayed ?? 0);
+  if (roundsPlayedDiff !== 0) return roundsPlayedDiff;
+
+  const preDropPointsDiff = (b.pointsBeforeDrop ?? 0) - (a.pointsBeforeDrop ?? 0);
+  if (preDropPointsDiff !== 0) return preDropPointsDiff;
+
+  const winRateDiff = b.winRate - a.winRate;
+  if (winRateDiff !== 0) return winRateDiff;
+
+  const winsDiff = b.wins - a.wins;
+  if (winsDiff !== 0) return winsDiff;
+
+  const rankA = a.seedRank ?? Number.POSITIVE_INFINITY;
+  const rankB = b.seedRank ?? Number.POSITIVE_INFINITY;
+  return rankA - rankB;
+}
 
 const LEAGUE_ROUND_CALENDAR = [
   "01/04",
@@ -31,16 +57,16 @@ const LEAGUE_ROUND_CALENDAR = [
   "29/04",
   "06/05",
   "13/05",
-  "20/05",
-  "27/05 - la top 8 potente",
+  "27/05",
+  "03/06",
 ];
 
 const LEAGUE_INFO_RULES = [
   "Torneo ufficiale Bandai.",
-  "Partecipativa a tutti i partecipanti e busta winner al vincitore.",
+  "Partecipativa a tutti i partecipanti e busta premio al vincitore.",
   "Torneo stile Svizzera.",
   "Il costo di iscrizione verra' messo in palio ai migliori risultati.",
-  "Vengono premiati i migliori due risultati (4-0, 3-1).",
+  "Vengono premiati i migliori risultati (5-0, 4-1).",
   "Parte dell'iscrizione verra messa in palio per la premiazione della lega.",
 ];
 
@@ -188,6 +214,82 @@ function normalizeHeaderToken(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function parseStoricoCsvDocument(content) {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return null;
+  const headers = parseCsvLine(lines[0]);
+  const displayHeaders = headers.filter((h) => normalizeHeaderToken(h) !== "leader");
+  if (displayHeaders.length === 0) return null;
+  const rows = lines
+    .slice(1)
+    .map((line) => {
+      const values = parseCsvLine(line);
+      const row = {};
+      displayHeaders.forEach((h) => {
+        const idx = headers.indexOf(h);
+        row[h] = values[idx] ?? "";
+      });
+      return row;
+    })
+    .filter((row) => displayHeaders.some((h) => String(row[h] ?? "").trim() !== ""));
+  if (rows.length === 0) return null;
+  return { displayHeaders, rows };
+}
+
+function italianizeStoricoColumnHeader(header) {
+  const t = normalizeHeaderToken(header);
+  if (t === "ranking") return "Posizione";
+  if (t === "name") return "Giocatore";
+  if (t === "member") return "Membro";
+  if (t === "points") return "Punti";
+  if (t === "omw") return "OMV %";
+  if (t === "oomw") return "OOMV %";
+  return header;
+}
+
+const MAX_STORICO_TAPPE = 7;
+
+function getTappaOrderFromFileName(fileName) {
+  const match = String(fileName ?? "").toUpperCase().match(/TAPPA\s*([0-9]+)/);
+  if (!match) return Number.POSITIVE_INFINITY;
+  return Number.parseInt(match[1], 10);
+}
+
+function normalizeStoricoDocuments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((doc, index) => {
+      const fileName = String(doc?.fileName ?? "").trim();
+      const columns = Array.isArray(doc?.columns) ? doc.columns.filter(Boolean).map(String) : [];
+      const rows = Array.isArray(doc?.rows) ? doc.rows : [];
+      if (!fileName || columns.length === 0 || rows.length === 0) return null;
+      return {
+        id: String(doc?.id ?? `storico-${index}`),
+        fileName,
+        columns,
+        rows: rows.map((row) => {
+          const next = {};
+          columns.forEach((col) => {
+            next[col] = String(row?.[col] ?? "");
+          });
+          return next;
+        }),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aOrder = getTappaOrderFromFileName(a.fileName);
+      const bOrder = getTappaOrderFromFileName(b.fileName);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.fileName.localeCompare(b.fileName);
+    })
+    .filter((doc) => getTappaOrderFromFileName(doc.fileName) <= MAX_STORICO_TAPPE)
+    .slice(0, MAX_STORICO_TAPPE);
+}
+
 function toNormalizedCsvRow(row) {
   const normalized = {};
   Object.entries(row).forEach(([key, value]) => {
@@ -219,6 +321,28 @@ function buildInitialEntries() {
 
 function buildInitialRoundColumns() {
   return [];
+}
+
+function buildInitialTop8BracketState() {
+  return {
+    qfWinnerIds: [null, null, null, null],
+    sfWinnerIds: [null, null],
+    finalWinnerId: null,
+  };
+}
+
+function normalizeTop8BracketState(value) {
+  const initial = buildInitialTop8BracketState();
+  if (!value || typeof value !== "object") return initial;
+  const qfWinnerIds = Array.isArray(value.qfWinnerIds) ? value.qfWinnerIds.slice(0, 4) : [];
+  while (qfWinnerIds.length < 4) qfWinnerIds.push(null);
+  const sfWinnerIds = Array.isArray(value.sfWinnerIds) ? value.sfWinnerIds.slice(0, 2) : [];
+  while (sfWinnerIds.length < 2) sfWinnerIds.push(null);
+  return {
+    qfWinnerIds: qfWinnerIds.map((x) => (typeof x === "string" ? x : null)),
+    sfWinnerIds: sfWinnerIds.map((x) => (typeof x === "string" ? x : null)),
+    finalWinnerId: typeof value.finalWinnerId === "string" ? value.finalWinnerId : null,
+  };
 }
 
 function hashString(input) {
@@ -274,7 +398,7 @@ function buildLeaderCatalog(records) {
 
     const colors = colorTokens.length ? colorTokens : ["blue"];
     const meta = {
-      name: item.card_name || item.card_set_id || item.card_image_id || "Unknown Leader",
+      name: item.card_name || item.card_set_id || item.card_image_id || "Leader sconosciuto",
       colors,
       image: item.card_image || null,
     };
@@ -340,13 +464,16 @@ function normalizeSharedState(payload) {
   const safeEntries = Array.isArray(payload?.leaderboardEntries) ? payload.leaderboardEntries : buildInitialEntries();
   const safeRounds = Array.isArray(payload?.roundColumns) ? payload.roundColumns : buildInitialRoundColumns();
   const safeLink = typeof payload?.nextEventLink === "string" ? payload.nextEventLink : "";
-  const safeWorstTwoVisible =
-    typeof payload?.worstTwoButtonVisible === "boolean" ? payload.worstTwoButtonVisible : false;
+  const safeWorstTwoVisible = true;
+  const safeStoricoDocuments = normalizeStoricoDocuments(payload?.storicoDocuments);
+  const safeTop8BracketState = normalizeTop8BracketState(payload?.top8BracketState);
   return {
     leaderboardEntries: safeEntries,
     roundColumns: safeRounds,
     nextEventLink: safeLink,
     worstTwoButtonVisible: safeWorstTwoVisible,
+    storicoDocuments: safeStoricoDocuments,
+    top8BracketState: safeTop8BracketState,
   };
 }
 
@@ -374,6 +501,8 @@ function applyLeagueStateToUi(state, setters) {
   setters.setNextEventLink(state.nextEventLink);
   setters.setNextEventLinkInput(state.nextEventLink);
   if (setters.setWorstTwoButtonVisible) setters.setWorstTwoButtonVisible(state.worstTwoButtonVisible);
+  if (setters.setStoricoDocuments) setters.setStoricoDocuments(state.storicoDocuments);
+  if (setters.setTop8BracketState) setters.setTop8BracketState(state.top8BracketState);
 }
 
 async function loadSharedStateToUi(setters, { silent = false } = {}) {
@@ -381,17 +510,17 @@ async function loadSharedStateToUi(setters, { silent = false } = {}) {
     const fetchedState = await fetchLeagueState();
     if (fetchedState) {
       applyLeagueStateToUi(fetchedState, setters);
-      if (!silent) setters.setUploadStatus("Shared league loaded.");
+      if (!silent) setters.setUploadStatus("Dati lega condivisi caricati.");
       return true;
     }
 
     const emptyState = normalizeSharedState({});
     await saveLeagueState(emptyState);
     applyLeagueStateToUi(emptyState, setters);
-    if (!silent) setters.setUploadStatus("Shared league ready.");
+    if (!silent) setters.setUploadStatus("Lega condivisa pronta.");
     return true;
   } catch {
-    if (!silent) setters.setUploadStatus("Unable to load shared league data from Netlify.");
+    if (!silent) setters.setUploadStatus("Impossibile caricare i dati della lega da Netlify.");
     return false;
   }
 }
@@ -403,7 +532,7 @@ async function persistSharedState(setters, nextState, successMessage) {
     if (successMessage) setters.setUploadStatus(successMessage);
     return true;
   } catch {
-    setters.setUploadStatus("Unable to sync shared league data to Netlify.");
+    setters.setUploadStatus("Impossibile sincronizzare i dati della lega con Netlify.");
     return false;
   }
 }
@@ -452,30 +581,24 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort, worstTwoStand
             <thead className="bg-[#e8d7b2]">
               <tr>
                 <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Position" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
+                  <SortHeader label="Posizione" sortKey="position" sortConfig={sortConfig} onSort={onSort} />
                 </th>
                 <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Bandai ID" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
+                  <SortHeader label="ID Bandai" sortKey="memberNumber" sortConfig={sortConfig} onSort={onSort} />
                 </th>
                 <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Player" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
+                  <SortHeader label="Giocatore" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
                 </th>
                 <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Points" sortKey="points" sortConfig={sortConfig} onSort={onSort} />
+                  <SortHeader label="Punti" sortKey="points" sortConfig={sortConfig} onSort={onSort} />
                 </th>
                 <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Wins" sortKey="wins" sortConfig={sortConfig} onSort={onSort} />
-                </th>
-                <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Losses" sortKey="losses" sortConfig={sortConfig} onSort={onSort} />
-                </th>
-                <th className="px-4 py-3 text-left whitespace-nowrap">
-                  <SortHeader label="Win Rate" sortKey="winRate" sortConfig={sortConfig} onSort={onSort} />
+                  <SortHeader label="% Vittorie" sortKey="winRate" sortConfig={sortConfig} onSort={onSort} />
                 </th>
                 {roundColumns.map((roundNumber) => (
                   <th key={`round-col-${roundNumber}`} className="px-3 py-3 text-left">
                     <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">
-                      R{roundNumber}
+                      T{roundNumber}
                     </span>
                   </th>
                 ))}
@@ -483,23 +606,20 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort, worstTwoStand
             </thead>
             <tbody className="divide-y divide-[#d7c49b]">
               {data.map((entry) => {
-                const isTop3 = entry.position <= 3;
+                const isTop8 = entry.position <= 8;
                 return (
                   <motion.tr
                     key={entry.playerId}
                     layout="position"
                     transition={standingsRowLayoutTransition}
                     className={`transition-colors duration-200 ${
-                      isTop3
+                      isTop8
                         ? "bg-gradient-to-r from-amber-200/80 via-yellow-100/70 to-orange-100/70"
                         : "hover:bg-amber-100/70"
                     }`}
                   >
                     <td className="px-4 py-3 text-sm text-slate-800">
                       <div className="flex items-center gap-2">
-                        {entry.position <= 3 ? (
-                          <Medal className={`h-4 w-4 ${medalColors[entry.position - 1]}`} />
-                        ) : null}
                         <span>{entry.position}</span>
                       </div>
                     </td>
@@ -516,8 +636,6 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort, worstTwoStand
                         {entry.points}
                       </motion.span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-emerald-800 tabular-nums">{formatRatioValue(entry.wins)}</td>
-                    <td className="px-4 py-3 text-sm text-rose-800 tabular-nums">{formatRatioValue(entry.losses)}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-sky-900 tabular-nums">{entry.winRate}%</td>
                     {roundColumns.map((roundNumber) => {
                       const roundResult = entry.roundResults[roundNumber];
@@ -537,6 +655,395 @@ function RankingsSection({ data, roundColumns, sortConfig, onSort, worstTwoStand
         </LayoutGroup>
       </div>
     </motion.div>
+  );
+}
+
+// ─── Top 8 QF: one footnote per slot, bracket order (1 → 8 → 4 → 5 → 3 → 6 → 2 → 7) — edit only these strings ───
+const BRACKET_QF_SLOT_COMMENTS = [
+  "L'IMBATTIBILE",
+  "IL BIMBO DI IMU",
+  "IL DEX BFF",
+  "IL MANZI BFF",
+  "IL BAMBINO DEMONIACO",
+  "IL MAZZO NON PUO' PERDERE",
+  "L'ENEL SLAYER",
+  "LO SCHIAPPATO",
+];
+
+function isTopFourBracketSeed(entry) {
+  return Boolean(entry && typeof entry.position === "number" && entry.position >= 1 && entry.position <= 4);
+}
+
+function BracketTeamBox({ name, comment, accent = "qf", showDice = false }) {
+  const edgeClass =
+    accent === "qf"
+      ? "bg-gradient-to-b from-amber-600 via-amber-800 to-amber-950"
+      : "bg-gradient-to-b from-amber-500 via-amber-600 to-amber-800";
+
+  const showComment = typeof comment === "string" && comment.trim().length > 0;
+
+  return (
+    <div className="flex min-h-[4rem] w-full min-w-0 rounded-2xl border-2 border-[#b89a6a]/90 bg-[#fffdf9] shadow-[0_2px_8px_rgba(45,32,18,0.12)] sm:min-h-[4.25rem]">
+      <div className={`w-1.5 shrink-0 self-stretch sm:w-2 ${edgeClass}`} aria-hidden />
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <p className="min-w-0 flex-1 break-words text-pretty text-base font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere] sm:text-lg">
+            {name || "—"}
+          </p>
+          {showDice ? (
+            <Dice5
+              className="mt-0.5 h-4 w-4 shrink-0 text-amber-900/85 sm:h-5 sm:w-5"
+              strokeWidth={2}
+              aria-hidden
+            />
+          ) : null}
+        </div>
+        {showComment ? (
+          <p className="line-clamp-3 text-xs font-normal leading-snug text-slate-600 sm:text-sm">{comment.trim()}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Standard 8-team single elim: QF order top→bottom is 1v8, 4v5, 3v6, 2v7 so 1 and 2 meet only in final. */
+function TopEightBracketSection({ rankedEntries, isAdminUnlocked = false, bracketState, onBracketStateChange }) {
+  const seeds = useMemo(() => {
+    const top = rankedEntries.slice(0, 8);
+    const padded = [...top];
+    while (padded.length < 8) padded.push(null);
+    return padded;
+  }, [rankedEntries]);
+
+  const qf = useMemo(
+    () => [
+      { key: "qf1", a: seeds[0], b: seeds[7], commentA: BRACKET_QF_SLOT_COMMENTS[0], commentB: BRACKET_QF_SLOT_COMMENTS[1] },
+      { key: "qf2", a: seeds[3], b: seeds[4], commentA: BRACKET_QF_SLOT_COMMENTS[2], commentB: BRACKET_QF_SLOT_COMMENTS[3] },
+      { key: "qf3", a: seeds[2], b: seeds[5], commentA: BRACKET_QF_SLOT_COMMENTS[4], commentB: BRACKET_QF_SLOT_COMMENTS[5] },
+      { key: "qf4", a: seeds[1], b: seeds[6], commentA: BRACKET_QF_SLOT_COMMENTS[6], commentB: BRACKET_QF_SLOT_COMMENTS[7] },
+    ],
+    [seeds]
+  );
+
+  const normalizedBracketState = normalizeTop8BracketState(bracketState);
+  const byPlayerId = useMemo(() => {
+    const map = new Map();
+    seeds.forEach((entry) => {
+      if (entry?.playerId) map.set(entry.playerId, entry);
+    });
+    return map;
+  }, [seeds]);
+  const qfWinners = normalizedBracketState.qfWinnerIds.map((id) => (id ? byPlayerId.get(id) ?? null : null));
+  const sfWinners = normalizedBracketState.sfWinnerIds.map((id) => (id ? byPlayerId.get(id) ?? null : null));
+  const finalWinner = normalizedBracketState.finalWinnerId ? byPlayerId.get(normalizedBracketState.finalWinnerId) ?? null : null;
+
+  const sfSlots = [
+    [qfWinners[0], qfWinners[1]],
+    [qfWinners[2], qfWinners[3]],
+  ];
+
+  const finalSlots = [sfWinners[0], sfWinners[1]];
+
+  function selectQfWinner(matchIndex, winner) {
+    const nextQfWinnerIds = [...normalizedBracketState.qfWinnerIds];
+    nextQfWinnerIds[matchIndex] = winner?.playerId ?? null;
+    const sfIndex = matchIndex < 2 ? 0 : 1;
+    const nextSfWinnerIds = [...normalizedBracketState.sfWinnerIds];
+    nextSfWinnerIds[sfIndex] = null;
+    onBracketStateChange({
+      qfWinnerIds: nextQfWinnerIds,
+      sfWinnerIds: nextSfWinnerIds,
+      finalWinnerId: null,
+    });
+  }
+
+  function selectSfWinner(matchIndex, winner) {
+    const nextSfWinnerIds = [...normalizedBracketState.sfWinnerIds];
+    nextSfWinnerIds[matchIndex] = winner?.playerId ?? null;
+    onBracketStateChange({
+      qfWinnerIds: normalizedBracketState.qfWinnerIds,
+      sfWinnerIds: nextSfWinnerIds,
+      finalWinnerId: null,
+    });
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)] [-webkit-overflow-scrolling:touch]">
+      {isAdminUnlocked ? (
+        <div className="border-b border-[#d7c49b] bg-[#e8d7b2] px-4 py-2 text-xs font-semibold text-slate-700">
+          Modalita' admin: usa i pulsanti "Avanza" e "Indietro" per aggiornare il tabellone.
+        </div>
+      ) : null}
+      <div className="relative min-w-[960px] p-5 sm:min-w-[1040px] sm:p-7 lg:min-w-[1120px] lg:p-8">
+        <div className="relative flex min-h-[440px] items-stretch gap-1.5 sm:min-h-[480px] sm:gap-2">
+          {/* Quarterfinals — slightly narrower so SF/F get more room */}
+          <div className="flex min-w-0 flex-[0.95] flex-col justify-between gap-3 self-stretch py-2 sm:gap-4 sm:py-3">
+            {qf.map((m, qfIndex) => (
+              <div key={m.key} className="flex min-w-0 w-full flex-col gap-2 py-1 sm:gap-2.5 sm:py-1.5">
+                <div className="space-y-1">
+                  <BracketTeamBox
+                    name={m.a?.name ?? "Da definire"}
+                    comment={m.commentA}
+                    accent="qf"
+                    showDice={isTopFourBracketSeed(m.a)}
+                  />
+                  {isAdminUnlocked ? (
+                    <div className="flex justify-end gap-1 pr-1">
+                      <button
+                        type="button"
+                        onClick={() => selectQfWinner(qfIndex, m.a)}
+                        className="rounded-md border border-amber-300/70 bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-900 hover:bg-amber-100 disabled:opacity-40"
+                        disabled={!m.a}
+                      >
+                        Avanza
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectQfWinner(qfIndex, null)}
+                        className="rounded-md border border-slate-300/70 bg-slate-100/80 px-2 py-0.5 text-[11px] font-semibold text-slate-800 hover:bg-white"
+                      >
+                        Indietro
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <BracketTeamBox
+                    name={m.b?.name ?? "Da definire"}
+                    comment={m.commentB}
+                    accent="qf"
+                    showDice={isTopFourBracketSeed(m.b)}
+                  />
+                  {isAdminUnlocked ? (
+                    <div className="flex justify-end gap-1 pr-1">
+                      <button
+                        type="button"
+                        onClick={() => selectQfWinner(qfIndex, m.b)}
+                        className="rounded-md border border-amber-300/70 bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-900 hover:bg-amber-100 disabled:opacity-40"
+                        disabled={!m.b}
+                      >
+                        Avanza
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectQfWinner(qfIndex, null)}
+                        className="rounded-md border border-slate-300/70 bg-slate-100/80 px-2 py-0.5 text-[11px] font-semibold text-slate-800 hover:bg-white"
+                      >
+                        Indietro
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* QF → SF lines */}
+          <div className="relative w-6 shrink-0 self-stretch sm:w-9" aria-hidden>
+            <svg className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 40 280">
+              <path
+                d="M 0 35 H 14 V 70 H 0 M 0 105 H 14 V 70 M 14 70 H 40 M 0 175 H 14 V 210 H 0 M 0 245 H 14 V 210 M 14 210 H 40"
+                fill="none"
+                stroke="#5c4428"
+                strokeWidth="1.75"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+
+          {/* Semifinals — wider than before */}
+          <div className="flex min-w-0 flex-[1.05] flex-col justify-center gap-24 self-stretch py-4 sm:gap-32 sm:py-6">
+            {[0, 1].map((sfIndex) => (
+              <div key={`sf-${sfIndex}`} className="flex min-w-0 w-full flex-col gap-2 sm:gap-2.5">
+                {[0, 1].map((slotIndex) => (
+                  <div key={`sf-${sfIndex}-${slotIndex}`} className="space-y-1">
+                    <BracketTeamBox name={sfSlots[sfIndex][slotIndex]?.name ?? "TBD"} accent="advance" />
+                    {isAdminUnlocked ? (
+                      <div className="flex justify-end gap-1 pr-1">
+                        <button
+                          type="button"
+                          onClick={() => selectSfWinner(sfIndex, sfSlots[sfIndex][slotIndex])}
+                          className="rounded-md border border-amber-300/70 bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-900 hover:bg-amber-100 disabled:opacity-40"
+                          disabled={!sfSlots[sfIndex][slotIndex]}
+                        >
+                          Avanza
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextQfWinnerIds = [...normalizedBracketState.qfWinnerIds];
+                            nextQfWinnerIds[sfIndex * 2 + slotIndex] = null;
+                            const nextSfWinnerIds = [...normalizedBracketState.sfWinnerIds];
+                            nextSfWinnerIds[sfIndex] = null;
+                            onBracketStateChange({
+                              qfWinnerIds: nextQfWinnerIds,
+                              sfWinnerIds: nextSfWinnerIds,
+                              finalWinnerId: null,
+                            });
+                          }}
+                          className="rounded-md border border-slate-300/70 bg-slate-100/80 px-2 py-0.5 text-[11px] font-semibold text-slate-800 hover:bg-white"
+                        >
+                          Indietro
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* SF → F lines */}
+          <div className="relative w-6 shrink-0 self-stretch sm:w-9" aria-hidden>
+            <svg className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 40 200">
+              <path
+                d="M 0 50 H 14 V 100 H 0 M 0 150 H 14 V 100 M 14 100 H 40"
+                fill="none"
+                stroke="#5c4428"
+                strokeWidth="1.75"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+
+          {/* Final */}
+          <div className="flex min-w-0 flex-[1] flex-col justify-center self-stretch py-4 sm:py-6">
+            <div className="flex min-w-0 w-full flex-col gap-2 sm:gap-2.5">
+              {[0, 1].map((slotIndex) => (
+                <div key={`f-${slotIndex}`} className="space-y-1">
+                  <BracketTeamBox name={finalSlots[slotIndex]?.name ?? "TBD"} accent="advance" />
+                  {isAdminUnlocked ? (
+                    <div className="flex justify-end gap-1 pr-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onBracketStateChange({
+                            qfWinnerIds: normalizedBracketState.qfWinnerIds,
+                            sfWinnerIds: normalizedBracketState.sfWinnerIds,
+                            finalWinnerId: finalSlots[slotIndex]?.playerId ?? null,
+                          })
+                        }
+                        className="rounded-md border border-amber-300/70 bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-900 hover:bg-amber-100 disabled:opacity-40"
+                        disabled={!finalSlots[slotIndex]}
+                      >
+                        Avanza
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onBracketStateChange({
+                            qfWinnerIds: normalizedBracketState.qfWinnerIds,
+                            sfWinnerIds: normalizedBracketState.sfWinnerIds.map((id, idx) =>
+                              idx === slotIndex ? null : id
+                            ),
+                            finalWinnerId: null,
+                          })
+                        }
+                        className="rounded-md border border-slate-300/70 bg-slate-100/80 px-2 py-0.5 text-[11px] font-semibold text-slate-800 hover:bg-white"
+                      >
+                        Indietro
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* F → Champion lines */}
+          <div className="relative w-6 shrink-0 self-center sm:w-9" aria-hidden>
+            <svg className="h-14 w-full overflow-visible sm:h-16" preserveAspectRatio="none" viewBox="0 0 40 56">
+              <path d="M 0 28 H 40" fill="none" stroke="#5c4428" strokeWidth="1.75" vectorEffect="non-scaling-stroke" />
+            </svg>
+          </div>
+
+          {/* Champion — fixed modest width */}
+          <div className="flex w-40 shrink-0 flex-col items-stretch justify-center gap-3 self-center sm:w-44">
+            <BracketTeamBox name={finalWinner?.name ?? "TBD"} accent="advance" />
+            <Trophy className="mx-auto h-10 w-10 text-amber-900/90 sm:h-12 sm:w-12" strokeWidth={1.25} aria-hidden />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoricoGiornateSection({ sessions, error, onToggle }) {
+
+  return (
+    <div className="space-y-4">
+      {error ? <p className="rounded-lg border border-rose-400/40 bg-rose-950/50 px-3 py-2 text-sm text-rose-100">{error}</p> : null}
+      {sessions.length === 0 ? (
+        <p className="rounded-lg border border-blue-200/25 bg-blue-950/40 px-3 py-2 text-sm text-blue-100/90">
+          Nessuna giornata disponibile: carica o aggiorna i CSV dal pannello amministratore.
+        </p>
+      ) : null}
+      {sessions.map((session) => (
+        <article
+          key={session.id}
+          className="overflow-hidden rounded-2xl border-2 border-[#d4b47d] bg-gradient-to-br from-[#f3e7cc] via-[#ecdcb9] to-[#e5d3ad] shadow-[0_14px_35px_rgba(2,6,23,0.25)]"
+        >
+          <button
+            type="button"
+            onClick={() => onToggle(session.id)}
+            className="flex w-full items-center justify-between gap-3 border-b border-[#c9b08a]/90 bg-[#e8d7b2]/80 px-4 py-3 text-left transition hover:bg-[#e8d7b2]"
+          >
+            <div className="min-w-0">
+              <h3 className="truncate font-bold text-slate-900">
+                {Number.isFinite(getTappaOrderFromFileName(session.fileName))
+                  ? `Tappa ${getTappaOrderFromFileName(session.fileName)}`
+                  : session.fileName}
+              </h3>
+              <p className="text-xs font-medium text-slate-600">{session.rows.length} righe in classifica</p>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-amber-900">
+              {session.open ? "Chiudi" : "Apri"}
+              {session.open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </span>
+          </button>
+          <AnimatePresence initial={false}>
+            {session.open ? (
+              <motion.div
+                key={session.id}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="overflow-hidden"
+              >
+                <div className="overflow-x-auto p-3 sm:p-4">
+                  <table className="w-full min-w-max divide-y divide-[#d7c49b] text-sm">
+                    <thead className="bg-[#e8d7b2]">
+                      <tr>
+                        {session.columns.map((col) => (
+                          <th
+                            key={col}
+                            className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-700 whitespace-nowrap"
+                          >
+                            {italianizeStoricoColumnHeader(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#d7c49b] bg-[#fffdf9]/90">
+                      {session.rows.map((row, ri) => (
+                        <tr key={ri} className="hover:bg-amber-100/60">
+                          {session.columns.map((col) => (
+                            <td key={col} className="px-3 py-2 tabular-nums text-slate-800">
+                              {String(row[col] ?? "")}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -782,7 +1289,7 @@ function RoundDeckPieChart({ entries }) {
               />
             ) : (
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-slate-800 text-[11px] text-slate-300">
-                No image
+                Nessuna immagine
               </div>
             )}
             <div className="min-w-0">
@@ -790,7 +1297,7 @@ function RoundDeckPieChart({ entries }) {
                 {hoveredTooltip.segment.leader}
               </p>
               <p className="mt-1 text-sm text-slate-300">
-                Decklists: {hoveredTooltip.segment.count} ({Math.round(hoveredTooltip.segment.percentage)}%)
+                Liste mazzo: {hoveredTooltip.segment.count} ({Math.round(hoveredTooltip.segment.percentage)}%)
               </p>
             </div>
           </div>
@@ -835,11 +1342,15 @@ function DecksSection({ roundDeckData }) {
               className="mb-2 flex w-full items-center justify-between gap-3 rounded-xl border border-blue-300/20 bg-blue-950/35 px-3 py-2 text-left transition hover:border-cyan-300/45"
             >
               <div>
-                <h3 className="text-lg font-semibold text-white">Round {roundData.round}</h3>
-                <p className="text-xs text-blue-100/75">{hasEntries ? `${totalDecks} decks logged` : "No leader data uploaded yet"}</p>
+                <h3 className="text-lg font-semibold text-white">Tappa {roundData.round}</h3>
+                <p className="text-xs text-blue-100/75">
+                  {hasEntries
+                    ? `${totalDecks} deck registrati`
+                    : "Nessun dato leader caricato per questa tappa"}
+                </p>
               </div>
               <span className="inline-flex items-center gap-2 text-sm font-medium text-cyan-100">
-                {hasEntries ? (isOpen ? "Collapse" : "Expand") : "Empty"}
+                {hasEntries ? (isOpen ? "Comprimi" : "Espandi") : "Vuoto"}
                 {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </span>
             </button>
@@ -865,8 +1376,76 @@ function DecksSection({ roundDeckData }) {
   );
 }
 
+function buildMergedLeaderboard(leaderboardEntries, roundColumns, dropWorstTwo) {
+  return leaderboardEntries.map((entry) => {
+    const allRounds = [];
+    let totalPoints = 0;
+    let totalWins = 0;
+    let totalLosses = 0;
+
+    let roundsPlayed = 0;
+    roundColumns.forEach((roundNumber) => {
+      const result = entry.roundResults[roundNumber];
+      if (result?.played) roundsPlayed += 1;
+      allRounds.push({
+        roundNumber,
+        result: result?.played ? result : { wins: 0, losses: 0, played: false, virtualZero: true },
+      });
+    });
+
+    const roundsToCount = (() => {
+      if (!dropWorstTwo || allRounds.length <= 2) return allRounds;
+      const sortedByWorst = [...allRounds].sort((a, b) => {
+        const pointDiff = a.result.wins - b.result.wins;
+        if (pointDiff !== 0) return pointDiff;
+        const playedDiff = Number(b.result.played) - Number(a.result.played);
+        if (playedDiff !== 0) return playedDiff;
+        const lossDiff = b.result.losses - a.result.losses;
+        if (lossDiff !== 0) return lossDiff;
+        return b.roundNumber - a.roundNumber;
+      });
+      const dropped = new Set(sortedByWorst.slice(0, 2).map((x) => x.roundNumber));
+      return allRounds.filter((x) => !dropped.has(x.roundNumber));
+    })();
+
+    let pointsBeforeDrop = 0;
+    allRounds.forEach(({ result }) => {
+      if (!result.played) return;
+      pointsBeforeDrop += result.wins;
+    });
+
+    const roundResults = {};
+    roundsToCount.forEach(({ roundNumber, result }) => {
+      if (!result.played) return;
+      roundResults[roundNumber] = result;
+      totalWins += result.wins;
+      totalLosses += result.losses;
+      totalPoints += result.wins;
+    });
+
+    const wins = totalWins;
+    const losses = totalLosses;
+    const totalMatches = wins + losses;
+    const winRate = totalMatches === 0 ? 0 : Math.round((wins / totalMatches) * 100);
+
+    return {
+      playerId: entry.key,
+      name: entry.name,
+      memberNumber: entry.memberNumber ?? "",
+      seedRank: Number.isFinite(entry.seedRank) ? entry.seedRank : null,
+      points: totalPoints,
+      pointsBeforeDrop,
+      roundsPlayed,
+      wins,
+      losses,
+      winRate,
+      roundResults,
+    };
+  });
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState("rankings");
+  const [activeTab, setActiveTab] = useState("top-8");
   const [sortConfig, setSortConfig] = useState({ key: "points", direction: "desc" });
   const [leaderboardEntries, setLeaderboardEntries] = useState(buildInitialEntries);
   const [roundColumns, setRoundColumns] = useState(buildInitialRoundColumns);
@@ -876,8 +1455,12 @@ export default function App() {
   const [nextEventLinkInput, setNextEventLinkInput] = useState("");
   const [isLeagueImageOpen, setIsLeagueImageOpen] = useState(false);
   const [matchesPerRoundUpload, setMatchesPerRoundUpload] = useState(5);
-  const [isWorstTwoModeButtonVisible, setIsWorstTwoModeButtonVisible] = useState(false);
-  const [isWorstTwoModeEnabled, setIsWorstTwoModeEnabled] = useState(false);
+  const [isWorstTwoModeButtonVisible, setIsWorstTwoModeButtonVisible] = useState(true);
+  const [isWorstTwoModeEnabled, setIsWorstTwoModeEnabled] = useState(true);
+  const [storicoDocuments, setStoricoDocuments] = useState([]);
+  const [top8BracketState, setTop8BracketState] = useState(buildInitialTop8BracketState);
+  const [openStoricoIds, setOpenStoricoIds] = useState([]);
+  const [storicoError, setStoricoError] = useState("");
   const [prizesStepPreview, setPrizesStepPreview] = useState(null);
   const [basketOp16Sprites, setBasketOp16Sprites] = useState([]);
   const prevEffectiveUnlockedRef = useRef(0);
@@ -889,16 +1472,18 @@ export default function App() {
     setNextEventLinkInput,
     setUploadStatus,
     setWorstTwoButtonVisible: setIsWorstTwoModeButtonVisible,
+    setStoricoDocuments,
+    setTop8BracketState,
   };
 
   useEffect(() => {
-    document.title = "Magic Lair League";
+    document.title = "Lega Magic Lair";
   }, []);
 
   useEffect(() => {
     if (activeTab === "admin" && !isUploadUnlocked) {
-      setActiveTab("rankings");
-      setUploadStatus("Admin tab is locked.");
+      setActiveTab("top-8");
+      setUploadStatus("La scheda amministrazione è bloccata.");
     }
   }, [activeTab, isUploadUnlocked]);
 
@@ -906,79 +1491,42 @@ export default function App() {
     void loadSharedStateToUi(sharedSetters, { silent: false });
   }, []);
 
-  const mergedRankings = useMemo(() => {
-    return leaderboardEntries.map((entry) => {
-      const allRounds = [];
-      let totalPoints = 0;
-      let totalWins = 0;
-      let totalLosses = 0;
-
-      roundColumns.forEach((roundNumber) => {
-        const result = entry.roundResults[roundNumber];
-        allRounds.push({
-          roundNumber,
-          result: result?.played ? result : { wins: 0, losses: 0, played: false, virtualZero: true },
-        });
-      });
-
-      const roundsToCount = (() => {
-        if (!isWorstTwoModeEnabled || allRounds.length <= 2) return allRounds;
-        const sortedByWorst = [...allRounds].sort((a, b) => {
-          const pointDiff = a.result.wins - b.result.wins; // fewer wins = worse
-          if (pointDiff !== 0) return pointDiff;
-          // Missing rounds (virtual 0) are considered worse than played rounds on ties.
-          const playedDiff = Number(b.result.played) - Number(a.result.played);
-          if (playedDiff !== 0) return playedDiff;
-          const lossDiff = b.result.losses - a.result.losses; // more losses = worse
-          if (lossDiff !== 0) return lossDiff;
-          return b.roundNumber - a.roundNumber; // latest round first on tie
-        });
-        const dropped = new Set(sortedByWorst.slice(0, 2).map((x) => x.roundNumber));
-        return allRounds.filter((x) => !dropped.has(x.roundNumber));
-      })();
-
-      const roundResults = {};
-      roundsToCount.forEach(({ roundNumber, result }) => {
-        if (!result.played) return;
-        roundResults[roundNumber] = result;
-        totalWins += result.wins;
-        totalLosses += result.losses;
-        totalPoints += result.wins;
-      });
-
-      const wins = totalWins;
-      const losses = totalLosses;
-      const totalMatches = wins + losses;
-      const winRate = totalMatches === 0 ? 0 : Math.round((wins / totalMatches) * 100);
-
-      return {
-        playerId: entry.key,
-        name: entry.name,
-        memberNumber: entry.memberNumber ?? "",
-        seedRank: Number.isFinite(entry.seedRank) ? entry.seedRank : null,
-        points: totalPoints,
-        wins,
-        losses,
-        winRate,
-        roundResults,
-      };
+  useEffect(() => {
+    setOpenStoricoIds((current) => {
+      const existing = new Set(storicoDocuments.map((item) => item.id));
+      const kept = current.filter((id) => existing.has(id));
+      if (kept.length > 0) return kept;
+      return storicoDocuments[0] ? [storicoDocuments[0].id] : [];
     });
-  }, [leaderboardEntries, roundColumns, isWorstTwoModeEnabled]);
+  }, [storicoDocuments]);
+
+  const mergedRankings = useMemo(
+    () => buildMergedLeaderboard(leaderboardEntries, roundColumns, isWorstTwoModeEnabled),
+    [leaderboardEntries, roundColumns, isWorstTwoModeEnabled]
+  );
+
+  const mergedRankingsTop8Seeding = useMemo(
+    () => buildMergedLeaderboard(leaderboardEntries, roundColumns, true),
+    [leaderboardEntries, roundColumns]
+  );
 
   const rankingsWithPosition = useMemo(() => {
     return [...mergedRankings]
-      .sort((a, b) => {
-        const pointDiff = b.points - a.points;
-        if (pointDiff !== 0) return pointDiff;
-        const rankA = a.seedRank ?? Number.POSITIVE_INFINITY;
-        const rankB = b.seedRank ?? Number.POSITIVE_INFINITY;
-        return rankA - rankB;
-      })
+      .sort(compareLeagueStandings)
       .map((entry, index) => ({
         ...entry,
         position: index + 1,
       }));
   }, [mergedRankings]);
+
+  const rankingsForTop8Bracket = useMemo(() => {
+    return [...mergedRankingsTop8Seeding]
+      .sort(compareLeagueStandings)
+      .map((entry, index) => ({
+        ...entry,
+        position: index + 1,
+      }));
+  }, [mergedRankingsTop8Seeding]);
 
   const sortedRankings = useMemo(() => {
     const sorted = [...rankingsWithPosition].sort((a, b) => {
@@ -1185,8 +1733,8 @@ export default function App() {
   }, [activeTab, top8PrizeBank.progressToNextBox]);
 
   const summaryStats = [
-    { label: "Players", value: leaderboardEntries.length },
-    { label: "Rounds", value: roundColumns.length },
+    { label: "Giocatori", value: leaderboardEntries.length },
+    { label: "Tappe", value: roundColumns.length },
   ];
 
   function handleSort(key) {
@@ -1204,7 +1752,7 @@ export default function App() {
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
       .trim();
     if (!code) {
-      setUploadStatus("Enter admin code.");
+      setUploadStatus("Inserisci il codice amministratore.");
       return false;
     }
 
@@ -1212,22 +1760,22 @@ export default function App() {
       const codeHash = await sha256Hex(code);
       if (codeHash === ADMIN_CODE_HASH) {
         setIsUploadUnlocked(true);
-        setUploadStatus("Uploader unlocked.");
+        setUploadStatus("Caricamento CSV sbloccato.");
         return true;
       }
       setUploadStatus("baco ci hai provato");
       window.alert("baco ci hai provato");
       return false;
     } catch {
-      setUploadStatus("Unable to verify admin code on this browser.");
+      setUploadStatus("Impossibile verificare il codice su questo browser.");
       return false;
     }
   }
 
   async function promptAdminUnlock() {
-    const code = window.prompt("Insert admin code to open Admin panel:");
+    const code = window.prompt("Inserisci il codice per aprire il pannello amministratore:");
     if (code === null) {
-      setUploadStatus("Admin unlock cancelled.");
+      setUploadStatus("Sblocco amministratore annullato.");
       return false;
     }
     return verifyAdminCode(code);
@@ -1254,9 +1802,10 @@ export default function App() {
       const text = await file.text();
       const rows = parseCsvRows(text);
       if (rows.length === 0) {
-        setUploadStatus("CSV has no valid rows.");
+        setUploadStatus("Il CSV non contiene righe valide.");
         return;
       }
+      const parsedStorico = parseStoricoCsvDocument(text);
 
       const nextRound = (roundColumns[roundColumns.length - 1] ?? 0) + 1;
       const matchesPerRound = Math.max(1, Math.min(12, Math.round(matchesPerRoundUpload || 5)));
@@ -1328,13 +1877,25 @@ export default function App() {
           leaderboardEntries: nextEntries,
           roundColumns: [...roundColumns, nextRound],
           nextEventLink,
-          worstTwoButtonVisible: isWorstTwoModeButtonVisible,
+          worstTwoButtonVisible: true,
+          top8BracketState,
+          storicoDocuments: parsedStorico
+            ? normalizeStoricoDocuments([
+                ...storicoDocuments,
+                {
+                  id: `storico-round-${nextRound}-${Date.now()}`,
+                  fileName: file.name,
+                  columns: parsedStorico.displayHeaders,
+                  rows: parsedStorico.rows,
+                },
+              ])
+            : storicoDocuments,
         },
-        `Round ${nextRound} uploaded successfully (${rows.length} rows, ${matchesPerRound} matches).`
+        `Tappa ${nextRound} caricata con successo (${rows.length} righe, ${matchesPerRound} partite).`
       );
       event.target.value = "";
     } catch {
-      setUploadStatus("Unable to process CSV file.");
+      setUploadStatus("Impossibile elaborare il file CSV.");
     }
   }
 
@@ -1345,16 +1906,18 @@ export default function App() {
         leaderboardEntries: [],
         roundColumns: [],
         nextEventLink,
-        worstTwoButtonVisible: false,
+        worstTwoButtonVisible: true,
+        top8BracketState: buildInitialTop8BracketState(),
+        storicoDocuments: [],
       },
-      "All leaderboard data cleared."
+      "Tutti i dati della classifica sono stati cancellati."
     );
   }
 
   async function saveNextEventLink() {
     const raw = nextEventLinkInput.trim();
     if (!raw) {
-      setUploadStatus("Insert a valid event link.");
+      setUploadStatus("Inserisci un link evento valido.");
       return;
     }
     const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
@@ -1364,10 +1927,29 @@ export default function App() {
         leaderboardEntries,
         roundColumns,
         nextEventLink: normalized,
-        worstTwoButtonVisible: isWorstTwoModeButtonVisible,
+        worstTwoButtonVisible: true,
+        top8BracketState,
+        storicoDocuments,
       },
-      "Next event link updated."
+      "Link evento aggiornato."
     );
+  }
+
+  function toggleStoricoSession(id) {
+    setOpenStoricoIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+  }
+
+  function handleTop8BracketStateChange(nextState) {
+    const normalized = normalizeTop8BracketState(nextState);
+    setTop8BracketState(normalized);
+    void persistSharedState(sharedSetters, {
+      leaderboardEntries,
+      roundColumns,
+      nextEventLink,
+      worstTwoButtonVisible: true,
+      storicoDocuments,
+      top8BracketState: normalized,
+    });
   }
 
   return (
@@ -1382,10 +1964,10 @@ export default function App() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.42)_78%,rgba(2,6,23,0.68)_100%)]" />
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="relative mb-8 rounded-3xl border border-amber-200/45 bg-[linear-gradient(120deg,rgba(44,77,152,0.9)_0%,rgba(57,104,168,0.86)_38%,rgba(178,126,53,0.72)_72%,rgba(39,89,150,0.88)_100%)] p-4 pb-28 shadow-[0_22px_55px_rgba(2,6,23,0.4)] backdrop-blur-[1px] sm:p-6 sm:pb-24">
+        <header className="relative mb-8 rounded-3xl border border-amber-200/45 bg-[linear-gradient(120deg,rgba(44,77,152,0.9)_0%,rgba(57,104,168,0.86)_38%,rgba(178,126,53,0.72)_72%,rgba(39,89,150,0.88)_100%)] p-4 pb-6 shadow-[0_22px_55px_rgba(2,6,23,0.4)] backdrop-blur-[1px] sm:p-6 sm:pb-24">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:gap-5">
-              <img src={logoNewml} alt="League logo" className="h-20 w-20 shrink-0 object-contain sm:h-28 sm:w-28" />
+              <img src={logoNewml} alt="Logo lega" className="h-20 w-20 shrink-0 object-contain sm:h-28 sm:w-28" />
               <div>
                 <h1 className="bg-gradient-to-r from-yellow-100 via-amber-100 to-orange-100 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl md:text-5xl">
                 {leagueMeta.leagueName}
@@ -1393,7 +1975,7 @@ export default function App() {
                 <p className="mt-2 text-sm text-cyan-50/95 md:text-base">{leagueMeta.subtitle}</p>
                 <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-200/30 bg-blue-950/35 px-3 py-1 text-xs text-amber-100/90">
                   <Anchor className="h-3.5 w-3.5" />
-                  <span>Grand Line Weekly Tournament</span>
+                  <span>Torneo settimanale</span>
                   <Waves className="h-3.5 w-3.5" />
                 </div>
                 <div className="mt-4 grid w-full max-w-md grid-cols-3 gap-2 sm:max-w-lg">
@@ -1410,7 +1992,7 @@ export default function App() {
               </div>
             </div>
           </div>
-          <nav className="absolute bottom-4 left-4 right-4 flex flex-wrap justify-end gap-2 sm:left-auto sm:right-4 sm:flex-nowrap">
+          <nav className="mt-4 flex flex-wrap gap-2 sm:absolute sm:bottom-4 sm:left-auto sm:right-4 sm:flex-nowrap sm:justify-end">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -1441,14 +2023,14 @@ export default function App() {
             }`}
           >
             <Anchor className="h-3.5 w-3.5" />
-            Admin
+            Amministrazione
           </button>
         </header>
         <div className="mb-8 h-2 rounded-full bg-[repeating-linear-gradient(90deg,#ca293f_0_14px,#efd492_14px_28px,#2d75b6_28px_42px)]" />
         {nextEventLink ? (
           <div className="mb-6 rounded-xl border border-amber-200/40 bg-blue-950/55 px-4 py-3 text-sm text-amber-100">
             <a href={nextEventLink} target="_blank" rel="noreferrer" className="transition hover:text-yellow-200 hover:underline">
-              Register to the next event: {nextEventLink}
+              Iscriviti al prossimo evento: {nextEventLink}
             </a>
           </div>
         ) : null}
@@ -1465,7 +2047,7 @@ export default function App() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-300" />
-                <h2 className="text-xl font-semibold text-white">Full Crew Standings</h2>
+                <h2 className="text-xl font-semibold text-white">Classifica generale</h2>
                 </div>
                 {isWorstTwoModeButtonVisible ? (
                   <button
@@ -1477,7 +2059,7 @@ export default function App() {
                         : "border-blue-200/25 bg-blue-950/35 text-cyan-100/90 hover:border-amber-200/60"
                     }`}
                   >
-                    {isWorstTwoModeEnabled ? "Worst 2 hidden" : "Hide worst 2 results"}
+                    {isWorstTwoModeEnabled ? "2 tappe peggiori nascoste" : "Nascondi le 2 tappe peggiori"}
                   </button>
                 ) : null}
               </div>
@@ -1487,6 +2069,49 @@ export default function App() {
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 worstTwoStandingsMode={isWorstTwoModeEnabled}
+              />
+            </motion.section>
+          ) : null}
+
+          {activeTab === "top-8" ? (
+            <motion.section
+              key="top-8"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Crown className="h-6 w-6 text-amber-300 sm:h-7 sm:w-7" />
+                  <h2 className="text-2xl font-semibold text-white sm:text-3xl">Tabellone Top 8</h2>
+                </div>
+              </div>
+              <TopEightBracketSection
+                rankedEntries={rankingsForTop8Bracket}
+                isAdminUnlocked={isUploadUnlocked}
+                bracketState={top8BracketState}
+                onBracketStateChange={handleTop8BracketStateChange}
+              />
+            </motion.section>
+          ) : null}
+
+          {activeTab === "storico" ? (
+            <motion.section
+              key="storico"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-amber-200" />
+                <h2 className="text-xl font-semibold text-white">Storico Giornate</h2>
+              </div>
+              <StoricoGiornateSection
+                sessions={storicoDocuments.map((item) => ({ ...item, open: openStoricoIds.includes(item.id) }))}
+                error={storicoError}
+                onToggle={toggleStoricoSession}
               />
             </motion.section>
           ) : null}
@@ -1501,7 +2126,7 @@ export default function App() {
             >
               <div className="mb-4 flex items-center gap-2">
                 <Compass className="h-5 w-5 text-amber-200" />
-                <h2 className="text-xl font-semibold text-white">Popular Decks</h2>
+                <h2 className="text-xl font-semibold text-white">Deck più usati</h2>
               </div>
               <DecksSection roundDeckData={roundDeckData} />
             </motion.section>
@@ -1516,7 +2141,7 @@ export default function App() {
             >
               <div className="mb-4 flex items-center gap-2">
                 <Waves className="h-5 w-5 text-amber-200" />
-                <h2 className="text-xl font-semibold text-white">League Info</h2>
+                <h2 className="text-xl font-semibold text-white">Info lega</h2>
               </div>
               <div className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-[360px_1fr] lg:items-start">
@@ -1526,7 +2151,7 @@ export default function App() {
                       onClick={() => setIsLeagueImageOpen(true)}
                       className="block w-full overflow-hidden rounded-xl transition hover:opacity-95"
                     >
-                      <img src="/leagueinfo.jpeg" alt="League info" className="w-full rounded-xl object-contain" />
+                      <img src="/leagueinfo.jpeg" alt="Informazioni lega" className="w-full rounded-xl object-contain" />
                     </button>
                   </div>
                   <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
@@ -1556,11 +2181,13 @@ export default function App() {
                   </div>
                     </div>
                     <div className="rounded-2xl border border-amber-200/30 bg-gradient-to-br from-blue-900/65 via-sky-950/70 to-indigo-900/65 p-4">
-                      <h3 className="mb-3 text-lg font-semibold text-amber-100">Round Calendar</h3>
+                      <h3 className="mb-3 text-lg font-semibold text-amber-100">Calendario tappe</h3>
                       <ul className="space-y-2">
                         {LEAGUE_ROUND_CALENDAR.map((roundDate, index) => (
                           <li key={roundDate} className="flex items-center justify-between rounded-lg border border-blue-200/20 bg-blue-950/35 px-3 py-2 text-sm">
-                            <span className="text-cyan-100">Round {index + 1}</span>
+                            <span className="text-cyan-100">
+                              {index === LEAGUE_ROUND_CALENDAR.length - 1 ? "Top 8 Finale" : `Tappa ${index + 1}`}
+                            </span>
                             <span className="font-semibold text-amber-100">{roundDate}</span>
                           </li>
                         ))}
@@ -1581,7 +2208,7 @@ export default function App() {
             >
               <div className="mb-4 flex items-center gap-2">
                 <Gift className="h-5 w-5 text-amber-200" />
-                <h2 className="text-xl font-semibold text-white">Prizes</h2>
+                <h2 className="text-xl font-semibold text-white">Premi</h2>
               </div>
               <div className="rounded-2xl border border-amber-200/35 bg-gradient-to-br from-[#173b7d]/80 via-[#7a1f35]/65 to-[#6b3f1d]/70 p-4 shadow-[0_10px_30px_rgba(2,6,23,0.3)]">
                 <h3 className="mb-3 text-lg font-semibold text-amber-100">Salvadanaio Premi Top 8</h3>
@@ -1611,7 +2238,7 @@ export default function App() {
                   </svg>
 
                   <div className="relative z-10 rounded-xl bg-transparent p-3">
-                    <img src="/lair_throw.png" alt="Lair throw" className="mx-auto h-40 w-full object-contain sm:h-48 lg:h-52" />
+                    <img src="/lair_throw.png" alt="Lancio premio Lair" className="mx-auto h-40 w-full object-contain sm:h-48 lg:h-52" />
                   </div>
 
                   <div className="relative z-10 h-[180px] overflow-visible rounded-xl sm:h-[220px] md:h-full md:min-h-[240px]">
@@ -1704,7 +2331,7 @@ export default function App() {
             >
               <div className="mb-4 flex items-center gap-2">
                 <Anchor className="h-5 w-5 text-amber-200" />
-                <h2 className="text-xl font-semibold text-white">Admin Panel</h2>
+                <h2 className="text-xl font-semibold text-white">Pannello amministratore</h2>
               </div>
               {isUploadUnlocked && (
                 <div className="rounded-xl border border-amber-200/30 bg-gradient-to-r from-blue-950/55 via-blue-900/45 to-blue-950/55 px-3 py-3 backdrop-blur-sm">
@@ -1721,12 +2348,12 @@ export default function App() {
                         onClick={clearAllLeaderboardData}
                         className="rounded-md border border-rose-300/60 bg-rose-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-rose-300"
                       >
-                        Clear all (test)
+                        Cancella tutto (test)
                       </button>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <label className="inline-flex items-center gap-2 text-xs text-blue-100/85">
-                        Matches per uploaded round
+                        Partite per ogni tappa caricata
                         <input
                           type="number"
                           min="1"
@@ -1743,14 +2370,14 @@ export default function App() {
                           onClick={() => setMatchesPerRoundUpload(5)}
                           className="rounded-md border border-blue-200/25 bg-blue-950/50 px-2 py-1 text-[11px] text-blue-100 transition hover:border-amber-200/60 hover:text-amber-100"
                         >
-                          Set 5
+                          Imposta 5
                         </button>
                         <button
                           type="button"
                           onClick={() => setMatchesPerRoundUpload(6)}
                           className="rounded-md border border-blue-200/25 bg-blue-950/50 px-2 py-1 text-[11px] text-blue-100 transition hover:border-amber-200/60 hover:text-amber-100"
                         >
-                          Set 6
+                          Imposta 6
                         </button>
                       </div>
                     </div>
@@ -1759,7 +2386,7 @@ export default function App() {
                         type="url"
                         value={nextEventLinkInput}
                         onChange={(event) => setNextEventLinkInput(event.target.value)}
-                        placeholder="https://... event registration link"
+                        placeholder="https://... link iscrizione evento"
                         className="w-full rounded-md border border-blue-200/25 bg-blue-950/50 px-2.5 py-1.5 text-xs text-blue-100 placeholder:text-blue-100/50"
                       />
                       <button
@@ -1767,36 +2394,14 @@ export default function App() {
                         onClick={saveNextEventLink}
                         className="rounded-md border border-amber-300/60 bg-amber-300 px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-amber-200"
                       >
-                        Save event link
+                        Salva link evento
                       </button>
                     </div>
                     <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       {uploadStatus ? <p className="text-[11px] text-blue-100/80">{uploadStatus}</p> : null}
                     </div>
-                    <div className="mt-2 rounded-md border border-blue-200/20 bg-blue-950/35 px-2.5 py-2">
-                      <label className="inline-flex items-center gap-2 text-xs text-blue-100/90">
-                        <input
-                          type="checkbox"
-                          checked={isWorstTwoModeButtonVisible}
-                          onChange={(event) => {
-                            const visible = event.target.checked;
-                            setIsWorstTwoModeButtonVisible(visible);
-                            if (!visible) setIsWorstTwoModeEnabled(false);
-                            void persistSharedState(
-                              sharedSetters,
-                              {
-                                leaderboardEntries,
-                                roundColumns,
-                                nextEventLink,
-                                worstTwoButtonVisible: visible,
-                              },
-                              "Ranking controls saved."
-                            );
-                          }}
-                          className="h-3.5 w-3.5 rounded border-blue-200/35 bg-blue-950/40"
-                        />
-                        Visible on Rankings panel: hide 2 worst results button
-                      </label>
+                    <div className="mt-2 rounded-md border border-blue-200/20 bg-blue-950/35 px-2.5 py-2 text-xs text-blue-100/90">
+                      In classifica il filtro "2 tappe peggiori nascoste" e' sempre attivo.
                     </div>
                   </div>
                 </div>
@@ -1815,11 +2420,11 @@ export default function App() {
             className="absolute right-4 top-4 rounded-full border border-white/20 bg-slate-900/70 px-3 py-1 text-sm text-white transition hover:bg-slate-800"
             onClick={() => setIsLeagueImageOpen(false)}
           >
-            Close
+            Chiudi
           </button>
           <img
             src="/leagueinfo.jpeg"
-            alt="League info enlarged"
+            alt="Informazioni lega ingrandite"
             className="max-h-[90vh] max-w-[92vw] rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
           />
         </div>
