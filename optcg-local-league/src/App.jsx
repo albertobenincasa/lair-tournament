@@ -2029,13 +2029,6 @@ export default function App() {
           </button>
         </header>
         <div className="mb-8 h-2 rounded-full bg-[repeating-linear-gradient(90deg,#ca293f_0_14px,#efd492_14px_28px,#2d75b6_28px_42px)]" />
-        {nextEventLink ? (
-          <div className="mb-6 rounded-xl border border-amber-200/40 bg-blue-950/55 px-4 py-3 text-sm text-amber-100">
-            <a href={nextEventLink} target="_blank" rel="noreferrer" className="transition hover:text-yellow-200 hover:underline">
-              Iscriviti al prossimo evento: {nextEventLink}
-            </a>
-          </div>
-        ) : null}
 
         <AnimatePresence mode="wait">
           {activeTab === "rankings" ? (
